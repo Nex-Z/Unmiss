@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX "reminders_source_notification_uq" ON "reminders" USING btree ("source_notification_id");

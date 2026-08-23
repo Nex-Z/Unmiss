@@ -1,0 +1,23 @@
+# Local secrets and machine-specific configuration
+**/.env
+**/.env.*
+!**/.env.example
+**/local.properties
+**/keystore/
+**/*.jks
+**/*.keystore
+
+# Dependencies and build output
+**/node_modules/
+**/build/
+**/.gradle/
+**/dist/
+**/*.apk
+**/*.aab
+**/*.idsig
+
+# IDE, logs, and temporary research artifacts
+**/.idea/
+**/*.iml
+**/*.log
+docs/liquid-glass-research/
