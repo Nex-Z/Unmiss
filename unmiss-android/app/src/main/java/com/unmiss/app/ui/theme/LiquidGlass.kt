@@ -222,3 +222,43 @@ fun AdaptiveGlassSurface(
         }
     }
 }
+
+@Composable
+fun Modifier.liquidNavigationIndicator(
+    tint: Color,
+    dragging: Boolean,
+): Modifier {
+    val backdrop = LocalLiquidBackdrop.current
+    val shape = RoundedCornerShape(28.dp)
+    return drawBackdrop(
+        backdrop = backdrop,
+        shape = { shape },
+        effects = {
+            vibrancy()
+            blur((if (dragging) 3.dp else 5.dp).toPx())
+            lens(
+                refractionHeight = (if (dragging) 18.dp else 12.dp).toPx(),
+                refractionAmount = (if (dragging) 28.dp else 18.dp).toPx(),
+                chromaticAberration = true,
+            )
+        },
+        highlight = { Highlight.Default.copy(alpha = if (dragging) 0.9f else 0.68f) },
+        shadow = {
+            Shadow(
+                radius = if (dragging) 12.dp else 7.dp,
+                color = Color.Black.copy(alpha = if (dragging) 0.12f else 0.07f),
+            )
+        },
+        innerShadow = {
+            InnerShadow(radius = 6.dp, alpha = if (dragging) 0.48f else 0.32f)
+        },
+        onDrawSurface = {
+            drawRect(Color.White.copy(alpha = 0.18f))
+            drawRect(tint.copy(alpha = if (dragging) 0.16f else 0.11f))
+        },
+    ).border(
+        width = 0.8.dp,
+        color = Color.White.copy(alpha = 0.7f),
+        shape = shape,
+    )
+}
