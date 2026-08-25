@@ -60,6 +60,7 @@ import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.PendingNotificationUpload
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -204,7 +205,7 @@ private fun HistoryFilters(
                 placeholder = { Text("搜索标题或通知内容") },
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
                 trailingIcon = {
-                    IconButton(onClick = onTogglePreciseTime) {
+                    AdaptiveLiquidIconButton(onClick = onTogglePreciseTime) {
                         Icon(
                             Icons.Filled.FilterList,
                             contentDescription = "精确时间筛选",

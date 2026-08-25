@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -21,13 +20,10 @@ import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -47,6 +43,10 @@ import androidx.compose.ui.unit.dp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.reminder.ReminderSyncWorker
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.theme.AdaptiveLiquidButton
+import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
+import com.unmiss.app.ui.theme.AdaptiveLiquidSwitch
+import com.unmiss.app.ui.theme.GlassButtonStyle
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -130,7 +130,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 TopAppBar(
                     title = { Text("设置") },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        AdaptiveLiquidIconButton(onClick = onBack) {
                             Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                         }
                     },
@@ -161,7 +161,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(
+                    AdaptiveLiquidSwitch(
                         checked = captureEnabled,
                         onCheckedChange = { enabled ->
                             captureEnabled = enabled
@@ -185,7 +185,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    Switch(
+                    AdaptiveLiquidSwitch(
                         checked = liquidGlassEnabled,
                         onCheckedChange = { enabled ->
                             liquidGlassEnabled = enabled
@@ -218,7 +218,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(enabled = !scheduleSaving, onClick = { showTimePicker() }) {
+                        AdaptiveLiquidIconButton(enabled = !scheduleSaving, onClick = { showTimePicker() }) {
                             Icon(Icons.Default.Add, contentDescription = "添加归纳时间")
                         }
                     }
@@ -257,7 +257,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
                             }
-                            IconButton(
+                            AdaptiveLiquidIconButton(
                                 enabled = analysisTimes.size > 1 && !scheduleSaving,
                                 onClick = { saveAnalysisTimes(analysisTimes - time) },
                             ) {
@@ -290,7 +290,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             unfocusedContainerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.40f),
                         ),
                     )
-                    Button(
+                    AdaptiveLiquidButton(
                         onClick = {
                             scope.launch {
                                 val previousUrl = settings.baseUrlOnce()
@@ -316,7 +316,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
-                    OutlinedButton(
+                    AdaptiveLiquidButton(
                         onClick = {
                             if (!confirmDelete) {
                                 confirmDelete = true
@@ -333,6 +333,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                             }
                         },
                         modifier = Modifier.fillMaxWidth(),
+                        style = GlassButtonStyle.DANGER,
                     ) { Text(if (confirmDelete) "确认永久删除" else "删除所有数据") }
                     deleteMessage?.let {
                         Text(

@@ -58,6 +58,8 @@ import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.ui.theme.LiquidGlass
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.theme.AdaptiveLiquidButton
+import com.unmiss.app.ui.theme.GlassButtonStyle
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -214,9 +216,9 @@ private fun SetupGroup(
                 SetupLine("发送提醒", postGranted)
                 SetupLine("监听应用", hasApps)
                 if (!captureEnabled) SetupLine("通知采集", false)
-                if (!listenerGranted) Button(onClick = onListenerPermission) { Text("开启通知使用权") }
-                if (!postGranted) OutlinedButton(onClick = onPostPermission) { Text("允许发送提醒") }
-                if (!hasApps) OutlinedButton(onClick = onOpenAllowlist) { Text("选择监听应用") }
+                if (!listenerGranted) AdaptiveLiquidButton(onClick = onListenerPermission) { Text("开启通知使用权") }
+                if (!postGranted) AdaptiveLiquidButton(onClick = onPostPermission, style = GlassButtonStyle.SECONDARY) { Text("允许发送提醒") }
+                if (!hasApps) AdaptiveLiquidButton(onClick = onOpenAllowlist, style = GlassButtonStyle.SECONDARY) { Text("选择监听应用") }
             }
         }
     }

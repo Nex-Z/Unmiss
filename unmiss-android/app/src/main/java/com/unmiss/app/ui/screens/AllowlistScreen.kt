@@ -52,6 +52,10 @@ import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.theme.AdaptiveLiquidButton
+import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
+import com.unmiss.app.ui.theme.AdaptiveLiquidSwitch
+import com.unmiss.app.ui.theme.GlassButtonStyle
 import kotlinx.coroutines.launch
 
 private enum class AllowlistLayer { ENABLED, ADD }
@@ -95,7 +99,7 @@ fun AllowlistScreen() {
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                         title = { Text("添加应用", fontWeight = FontWeight.SemiBold) },
                         navigationIcon = {
-                            IconButton(onClick = { layer = AllowlistLayer.ENABLED }) {
+                            AdaptiveLiquidIconButton(onClick = { layer = AllowlistLayer.ENABLED }) {
                                 Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                             }
                         },
@@ -155,7 +159,7 @@ private fun EnabledAppsLayer(
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
                 }
-                FilledTonalButton(onClick = onAdd) {
+                AdaptiveLiquidButton(onClick = onAdd, style = GlassButtonStyle.TONAL) {
                     Icon(Icons.Filled.Add, contentDescription = null)
                     Text("添加")
                 }
@@ -174,7 +178,7 @@ private fun EnabledAppsLayer(
             itemsIndexed(apps, key = { _, app -> app.packageName }) { index, app ->
                 AppGroupRow(index, apps.size) {
                     AppRow(app = app, trailing = {
-                        Switch(checked = true, onCheckedChange = { onRemove(app.packageName) })
+                        AdaptiveLiquidSwitch(checked = true, onCheckedChange = { onRemove(app.packageName) })
                     })
                 }
             }
@@ -235,7 +239,7 @@ private fun AddAppsLayer(
             itemsIndexed(apps, key = { _, app -> app.packageName }) { index, app ->
                 AppGroupRow(index, apps.size) {
                     AppRow(app = app, trailing = {
-                        Button(onClick = { onAdd(app.packageName) }) { Text("添加") }
+                        AdaptiveLiquidButton(onClick = { onAdd(app.packageName) }) { Text("添加") }
                     })
                 }
             }
@@ -298,6 +302,6 @@ private fun EmptyState(title: String, description: String, action: () -> Unit) {
     ) {
         Text(title, style = MaterialTheme.typography.titleMedium)
         Text(description, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
-        Button(onClick = action) { Text("添加应用") }
+        AdaptiveLiquidButton(onClick = action) { Text("添加应用") }
     }
 }

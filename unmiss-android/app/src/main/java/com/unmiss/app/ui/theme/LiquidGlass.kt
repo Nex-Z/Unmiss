@@ -35,7 +35,7 @@ import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 
-private val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop> {
+internal val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop> {
     error("Liquid glass requires a LayerBackdrop")
 }
 

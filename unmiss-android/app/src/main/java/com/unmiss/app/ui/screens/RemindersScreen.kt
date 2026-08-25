@@ -33,6 +33,8 @@ import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.reminder.ReminderDisplayWorker
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.theme.AdaptiveLiquidButton
+import com.unmiss.app.ui.theme.GlassButtonStyle
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -84,8 +86,9 @@ fun RemindersScreen() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text("可能遗漏 ${reminders.count { it.status == "candidate" }} 项", style = MaterialTheme.typography.titleMedium)
-                OutlinedButton(
+                AdaptiveLiquidButton(
                     enabled = !syncing,
+                    style = GlassButtonStyle.SECONDARY,
                     onClick = {
                         scope.launch {
                             syncing = true
@@ -200,11 +203,11 @@ private fun ReminderItem(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (reminder.status == "candidate") {
-                Button(onClick = onConfirm) { Text("提醒我") }
-                OutlinedButton(onClick = onDone) { Text("已处理") }
+                AdaptiveLiquidButton(onClick = onConfirm) { Text("提醒我") }
+                AdaptiveLiquidButton(onClick = onDone, style = GlassButtonStyle.SECONDARY) { Text("已处理") }
             } else {
-                Button(onClick = onDone) { Text("已完成") }
-                OutlinedButton(onClick = onSnooze) { Text("一小时后") }
+                AdaptiveLiquidButton(onClick = onDone) { Text("已完成") }
+                AdaptiveLiquidButton(onClick = onSnooze, style = GlassButtonStyle.SECONDARY) { Text("一小时后") }
             }
             TextButton(onClick = onIgnore) { Text("忽略") }
         }
