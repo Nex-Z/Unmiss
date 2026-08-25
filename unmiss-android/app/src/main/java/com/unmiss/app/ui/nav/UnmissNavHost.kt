@@ -22,6 +22,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -57,6 +58,8 @@ private data class BottomNavItem(val route: String, val label: String, val icon:
 
 @Composable
 fun UnmissNavHost() {
+    val liquidGlassEnabled by ServiceLocator.get().settingsDataStore.liquidGlassEnabled
+        .collectAsState(initial = true)
     val navController = rememberNavController()
     val items = listOf(
         BottomNavItem(Routes.HOME, "首页", Icons.Filled.Home),
@@ -71,7 +74,7 @@ fun UnmissNavHost() {
         UploadWorker.enqueueNow(navController.context)
     }
 
-    LiquidGlassCanvas {
+    LiquidGlassCanvas(enabled = liquidGlassEnabled) {
         Scaffold(
             containerColor = Color.Transparent,
             contentColor = MaterialTheme.colorScheme.onBackground,

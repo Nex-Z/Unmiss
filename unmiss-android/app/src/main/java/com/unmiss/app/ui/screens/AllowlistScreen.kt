@@ -51,7 +51,7 @@ import androidx.compose.ui.unit.dp
 import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
-import com.unmiss.app.ui.theme.LiquidGlass
+import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import kotlinx.coroutines.launch
 
 private enum class AllowlistLayer { ENABLED, ADD }
@@ -86,15 +86,21 @@ fun AllowlistScreen() {
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
             if (layer == AllowlistLayer.ADD) {
-                TopAppBar(
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                    title = { Text("添加应用", fontWeight = FontWeight.SemiBold) },
-                    navigationIcon = {
-                        IconButton(onClick = { layer = AllowlistLayer.ENABLED }) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                        }
-                    },
-                )
+                AdaptiveGlassSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                    color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
+                ) {
+                    TopAppBar(
+                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                        title = { Text("添加应用", fontWeight = FontWeight.SemiBold) },
+                        navigationIcon = {
+                            IconButton(onClick = { layer = AllowlistLayer.ENABLED }) {
+                                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            }
+                        },
+                    )
+                }
             }
         },
     ) { padding ->
@@ -196,7 +202,10 @@ private fun AddAppsLayer(
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(bottom = 12.dp),
             )
-            LiquidGlass(modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp), cornerRadius = 22) {
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth().padding(bottom = 16.dp),
+                shape = RoundedCornerShape(22.dp),
+            ) {
                 OutlinedTextField(
                     value = query,
                     onValueChange = onQueryChange,
@@ -242,7 +251,7 @@ private fun AppGroupRow(index: Int, total: Int, content: @Composable () -> Unit)
         index == total - 1 -> RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
         else -> RoundedCornerShape(0.dp)
     }
-    Surface(shape = shape, color = Color.White.copy(alpha = 0.86f)) {
+    AdaptiveGlassSurface(shape = shape, color = Color.White.copy(alpha = 0.86f)) {
         Column {
             content()
             if (index < total - 1) {

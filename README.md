@@ -40,6 +40,10 @@ Worker   = AI 失败重试 + 原文清理
 WorkManager = 同步 + 本地定时提醒
 ```
 
+Android 默认启用基于 Kyant0/AndroidLiquidGlass Backdrop 的全局液态玻璃材质；
+可在设置中关闭并回退到浅色半透明界面。玻璃效果统一覆盖应用背景、信息面板、
+筛选区域与底部导航，而不是只装饰单个按钮。
+
 ## 工作原理
 
 ```text

@@ -57,6 +57,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.ui.theme.LiquidGlass
+import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -207,7 +208,7 @@ private fun SetupGroup(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("完成设置")
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+        AdaptiveGlassSurface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
             Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 SetupLine("通知使用权", listenerGranted)
                 SetupLine("发送提醒", postGranted)
@@ -239,7 +240,7 @@ private fun SetupLine(label: String, complete: Boolean) {
 private fun NextReminder(reminder: LocalReminder?, onClick: () -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("下一条提醒")
-        Surface(
+        AdaptiveGlassSurface(
             modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
             shape = RoundedCornerShape(24.dp),
             color = Color.White.copy(alpha = 0.86f),
@@ -271,7 +272,7 @@ private fun HomeDestinations(
 ) {
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         SectionLabel("浏览")
-        Surface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+        AdaptiveGlassSurface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
             Column {
                 DestinationRow(Icons.Filled.History, "通知收录", "$capturedCount 条历史通知", onOpenHistory)
                 GroupDivider()

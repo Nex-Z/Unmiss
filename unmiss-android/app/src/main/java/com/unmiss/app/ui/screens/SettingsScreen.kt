@@ -28,7 +28,6 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -47,6 +46,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.reminder.ReminderSyncWorker
+import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import kotlinx.coroutines.launch
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
@@ -60,6 +60,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     var baseUrl by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
     var captureEnabled by remember { mutableStateOf(true) }
+    var liquidGlassEnabled by remember { mutableStateOf(true) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleteMessage by remember { mutableStateOf<String?>(null) }
     var analysisTimes by remember { mutableStateOf(listOf("22:00")) }
@@ -108,6 +109,7 @@ fun SettingsScreen(onBack: () -> Unit) {
     LaunchedEffect(Unit) {
         baseUrl = settings.baseUrlOnce()
         captureEnabled = settings.captureEnabledOnce()
+        liquidGlassEnabled = settings.liquidGlassEnabledOnce()
         analysisTimes = settings.analysisTimesOnce().sorted()
         runCatching { ServiceLocator.get().notificationRepository.analysisSchedule() }
             .onSuccess { remote ->
@@ -120,15 +122,21 @@ fun SettingsScreen(onBack: () -> Unit) {
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
-            TopAppBar(
-                title = { Text("设置") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-            )
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp),
+                color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
+            ) {
+                TopAppBar(
+                    title = { Text("设置") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        }
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                )
+            }
         },
     ) { padding ->
         Column(
@@ -139,7 +147,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 .padding(horizontal = 20.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
-            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+            AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(18.dp),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -163,7 +171,31 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            Surface(
+            AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth().padding(18.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text("液态玻璃", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            if (liquidGlassEnabled) "全局折射、模糊与材质层已开启" else "使用原来的浅色半透明样式",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Switch(
+                        checked = liquidGlassEnabled,
+                        onCheckedChange = { enabled ->
+                            liquidGlassEnabled = enabled
+                            scope.launch { settings.setLiquidGlassEnabled(enabled) }
+                        },
+                    )
+                }
+            }
+
+            AdaptiveGlassSurface(
                 modifier = Modifier.fillMaxWidth().animateContentSize(),
                 shape = RoundedCornerShape(24.dp),
                 color = Color.White.copy(alpha = 0.86f),
@@ -244,7 +276,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+            AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("服务端", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     OutlinedTextField(
@@ -276,7 +308,7 @@ fun SettingsScreen(onBack: () -> Unit) {
                 }
             }
 
-            Surface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
+            AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
                 Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Text("数据与隐私", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
                     Text(

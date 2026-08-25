@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
@@ -21,6 +22,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.LayerBackdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
@@ -29,16 +31,27 @@ import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
 import com.kyant.backdrop.effects.vibrancy
+import com.kyant.backdrop.highlight.Highlight
+import com.kyant.backdrop.shadow.InnerShadow
+import com.kyant.backdrop.shadow.Shadow
 
 private val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop> {
     error("Liquid glass requires a LayerBackdrop")
 }
 
+val LocalLiquidGlassEnabled = staticCompositionLocalOf { true }
+
 @Composable
-fun LiquidGlassCanvas(content: @Composable BoxScope.() -> Unit) {
+fun LiquidGlassCanvas(
+    enabled: Boolean = true,
+    content: @Composable BoxScope.() -> Unit,
+) {
     val backdrop = rememberLayerBackdrop()
 
-    CompositionLocalProvider(LocalLiquidBackdrop provides backdrop) {
+    CompositionLocalProvider(
+        LocalLiquidBackdrop provides backdrop,
+        LocalLiquidGlassEnabled provides enabled,
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Canvas(
                 modifier = Modifier
@@ -63,6 +76,17 @@ fun LiquidGlassCanvas(content: @Composable BoxScope.() -> Unit) {
                     radius = size.minDimension * 0.64f,
                     center = Offset(size.width * 1.02f, size.height * 0.06f),
                 )
+                if (enabled) {
+                    drawCircle(
+                        brush = Brush.radialGradient(
+                            listOf(Color(0x287E8CFF), Color(0x007E8CFF)),
+                            center = Offset(size.width * 0.48f, size.height * 0.38f),
+                            radius = size.minDimension * 0.42f,
+                        ),
+                        radius = size.minDimension * 0.42f,
+                        center = Offset(size.width * 0.48f, size.height * 0.38f),
+                    )
+                }
                 drawCircle(
                     brush = Brush.radialGradient(
                         listOf(Color(0x2E7CDCC8), Color(0x007CDCC8)),
@@ -91,11 +115,14 @@ fun LiquidGlassCanvas(content: @Composable BoxScope.() -> Unit) {
 fun LiquidGlass(
     modifier: Modifier = Modifier,
     cornerRadius: Int = 28,
+    glassShape: Shape? = null,
+    panel: Boolean = false,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
-    val shape = RoundedCornerShape(cornerRadius.dp)
+    val shape = glassShape ?: RoundedCornerShape(cornerRadius.dp)
     val backdrop = LocalLiquidBackdrop.current
+    val enhanced = LocalLiquidGlassEnabled.current
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -124,13 +151,24 @@ fun LiquidGlass(
                 shape = { shape },
                 effects = {
                     vibrancy()
-                    blur(8.dp.toPx())
+                    blur((if (panel) 10.dp else 8.dp).toPx())
                     lens(
-                        refractionHeight = 18.dp.toPx(),
-                        refractionAmount = 24.dp.toPx(),
-                        chromaticAberration = true,
+                        refractionHeight = (if (panel) 7.dp else 18.dp).toPx(),
+                        refractionAmount = (if (panel) 10.dp else 24.dp).toPx(),
+                        chromaticAberration = !panel,
                     )
                 },
+                highlight = if (enhanced) {
+                    { Highlight.Default.copy(alpha = 0.52f) }
+                } else null,
+                shadow = if (enhanced) {
+                  {
+                    Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.07f))
+                  }
+                } else null,
+                innerShadow = if (enhanced) {
+                    { InnerShadow(radius = 7.dp, alpha = 0.3f) }
+                } else null,
                 onDrawSurface = {
                     drawRect(Color.White.copy(alpha = 0.52f))
                 },
@@ -149,4 +187,38 @@ fun LiquidGlass(
             .then(clickable),
         content = content,
     )
+}
+
+@Composable
+fun AdaptiveGlassSurface(
+    modifier: Modifier = Modifier,
+    shape: Shape = RoundedCornerShape(24.dp),
+    color: Color = Color.White.copy(alpha = 0.86f),
+    onClick: (() -> Unit)? = null,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    if (LocalLiquidGlassEnabled.current) {
+        LiquidGlass(
+            modifier = modifier,
+            glassShape = shape,
+            panel = true,
+            onClick = onClick,
+            content = content,
+        )
+    } else {
+        if (onClick != null) {
+            Surface(
+                modifier = modifier,
+                shape = shape,
+                color = color,
+                onClick = onClick,
+            ) { Box(content = content) }
+        } else {
+            Surface(
+                modifier = modifier,
+                shape = shape,
+                color = color,
+            ) { Box(content = content) }
+        }
+    }
 }

@@ -4,7 +4,6 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.Context
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
@@ -60,7 +59,7 @@ import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.PendingNotificationUpload
-import com.unmiss.app.ui.theme.LiquidGlass
+import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -188,11 +187,16 @@ private fun HistoryFilters(
     onPickFrom: () -> Unit,
     onPickTo: () -> Unit,
 ) {
-    Column(
-        modifier = Modifier.background(MaterialTheme.colorScheme.background.copy(alpha = 0.91f)).padding(horizontal = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+    AdaptiveGlassSurface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(bottomStart = 26.dp, bottomEnd = 26.dp),
+        color = MaterialTheme.colorScheme.background.copy(alpha = 0.91f),
     ) {
-        LiquidGlass(modifier = Modifier.fillMaxWidth(), cornerRadius = 22) {
+        Column(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(22.dp)) {
             OutlinedTextField(
                 value = keyword,
                 onValueChange = onKeywordChange,
@@ -239,8 +243,8 @@ private fun HistoryFilters(
                 )
             }
         }
-        AnimatedVisibility(visible = showPreciseTime) {
-            LiquidGlass(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), cornerRadius = 20) {
+            AnimatedVisibility(visible = showPreciseTime) {
+                AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp), shape = RoundedCornerShape(20.dp)) {
                 Row(
                     modifier = Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -259,6 +263,7 @@ private fun HistoryFilters(
                         }
                     }
                 }
+            }
             }
         }
     }

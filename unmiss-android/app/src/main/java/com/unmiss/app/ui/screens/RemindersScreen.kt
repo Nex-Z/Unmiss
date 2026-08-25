@@ -1,7 +1,6 @@
 package com.unmiss.app.ui.screens
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -33,6 +32,7 @@ import androidx.compose.ui.graphics.Color
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.reminder.ReminderDisplayWorker
+import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
 import java.time.Instant
@@ -60,10 +60,19 @@ fun RemindersScreen() {
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
-            TopAppBar(
-                title = { Text("遗漏事项") },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-            )
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(
+                    bottomStart = 24.dp,
+                    bottomEnd = 24.dp,
+                ),
+                color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
+            ) {
+                TopAppBar(
+                    title = { Text("遗漏事项") },
+                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
+                )
+            }
         },
     ) { padding ->
         Column(
@@ -150,13 +159,16 @@ private fun ReminderItem(
     onSnooze: () -> Unit,
     onIgnore: () -> Unit,
 ) {
-    Column(
+    AdaptiveGlassSurface(
         modifier = Modifier
-            .fillMaxWidth()
-            .background(quadrant.color.copy(alpha = 0.075f))
-            .padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .fillMaxWidth(),
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
+        color = quadrant.color.copy(alpha = 0.075f),
     ) {
+      Column(
+        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+      ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -196,6 +208,7 @@ private fun ReminderItem(
             }
             TextButton(onClick = onIgnore) { Text("忽略") }
         }
+    }
     }
 }
 

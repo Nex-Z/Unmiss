@@ -24,6 +24,16 @@ class SettingsDataStore(private val context: Context) {
         context.dataStore.edit { prefs -> prefs[CAPTURE_ENABLED_KEY] = enabled }
     }
 
+    val liquidGlassEnabled: Flow<Boolean> = context.dataStore.data.map { prefs ->
+        prefs[LIQUID_GLASS_ENABLED_KEY] ?: true
+    }
+
+    suspend fun liquidGlassEnabledOnce(): Boolean = liquidGlassEnabled.first()
+
+    suspend fun setLiquidGlassEnabled(enabled: Boolean) {
+        context.dataStore.edit { prefs -> prefs[LIQUID_GLASS_ENABLED_KEY] = enabled }
+    }
+
     val enabledPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
         prefs[ENABLED_PACKAGES_KEY] ?: emptySet()
     }
@@ -84,6 +94,7 @@ class SettingsDataStore(private val context: Context) {
         private val ENABLED_PACKAGES_KEY = stringSetPreferencesKey("enabled_packages")
         private val BASE_URL_KEY = stringPreferencesKey("base_url")
         private val CAPTURE_ENABLED_KEY = booleanPreferencesKey("capture_enabled")
+        private val LIQUID_GLASS_ENABLED_KEY = booleanPreferencesKey("liquid_glass_enabled")
         private val ANALYSIS_TIMES_KEY = stringSetPreferencesKey("analysis_times")
         private val ALLOWLIST_INITIALIZED_KEY = booleanPreferencesKey("allowlist_initialized")
         const val DEFAULT_ANALYSIS_TIME = "22:00"
