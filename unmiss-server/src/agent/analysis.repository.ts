@@ -25,7 +25,7 @@ export class AnalysisRepository {
         ),
       )
       .returning(this.selection())
-    return rows[0] ?? null
+    return rows[0] ? normalizeNotificationRow(rows[0]) : null
   }
 
   async claimUnprocessed(limit: number): Promise<NotificationRow[]> {
@@ -56,7 +56,7 @@ export class AnalysisRepository {
         notification.posted_at AS "postedAt",
         notification.received_at AS "receivedAt"
     `)
-    return result.rows as unknown as NotificationRow[]
+    return result.rows.map(normalizeNotificationRow)
   }
 
   async release(id: string): Promise<void> {
@@ -107,4 +107,30 @@ export class AnalysisRepository {
       receivedAt: notifications.receivedAt,
     }
   }
+}
+
+export function normalizeNotificationRow(row: Record<string, unknown>): NotificationRow {
+  return {
+    id: String(row.id),
+    userId: String(row.userId),
+    deviceId: String(row.deviceId),
+    notificationKey: String(row.notificationKey),
+    packageName: String(row.packageName),
+    title: nullableString(row.title),
+    body: nullableString(row.body),
+    subText: nullableString(row.subText),
+    timezone: String(row.timezone),
+    postedAt: requiredDate(row.postedAt, 'postedAt'),
+    receivedAt: requiredDate(row.receivedAt, 'receivedAt'),
+  }
+}
+
+function nullableString(value: unknown): string | null {
+  return value === null || value === undefined ? null : String(value)
+}
+
+function requiredDate(value: unknown, field: string): Date {
+  const date = value instanceof Date ? value : new Date(String(value))
+  if (Number.isNaN(date.getTime())) throw new Error(`invalid ${field} from database`)
+  return date
 }

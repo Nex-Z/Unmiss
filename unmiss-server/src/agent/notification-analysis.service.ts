@@ -33,24 +33,27 @@ export class NotificationAnalysisService {
     await this.analyzeClaimed(notification)
   }
 
-  private async analyzeClaimed(notification: NotificationRow): Promise<void> {
+  private async analyzeClaimed(notification: NotificationRow): Promise<boolean> {
     try {
       const analysis = await this.requestAnalysis(notification)
       await this.analysisRepository.save(notification, analysis)
+      return true
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error'
       this.logger.warn(`notification analysis failed for ${notification.id}: ${message}`)
       await this.analysisRepository.release(notification.id)
+      return false
     }
   }
 
   async processPending(limit = 20): Promise<number> {
     if (!this.isConfigured()) return 0
     const pending = await this.analysisRepository.claimUnprocessed(limit)
+    let processed = 0
     for (const notification of pending) {
-      await this.analyzeClaimed(notification)
+      if (await this.analyzeClaimed(notification)) processed += 1
     }
-    return pending.length
+    return processed
   }
 
   private async requestAnalysis(
