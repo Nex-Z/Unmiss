@@ -7,7 +7,7 @@ import { WorkerSchedulerService } from './worker-scheduler.service'
 
 async function bootstrap(): Promise<void> {
   const app = await NestFactory.create<NestExpressApplication>(AppModule)
-  app.useBodyParser('json', { limit: '64kb' })
+  app.useBodyParser('json', { limit: '2mb' })
   app.useBodyParser('urlencoded', { limit: '64kb', extended: true })
   app.setGlobalPrefix('api/v1')
   app.useGlobalPipes(

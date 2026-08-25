@@ -51,8 +51,14 @@ interface PendingNotificationUploadDao {
     @Query("UPDATE pending_notification_uploads SET uploaded_at = :uploadedAt WHERE id = :id")
     suspend fun markUploaded(id: Long, uploadedAt: Long)
 
+    @Query("UPDATE pending_notification_uploads SET uploaded_at = :uploadedAt, last_error = NULL WHERE id IN (:ids)")
+    suspend fun markUploaded(ids: List<Long>, uploadedAt: Long)
+
     @Query("UPDATE pending_notification_uploads SET retry_count = retry_count + 1, last_error = :error WHERE id = :id")
     suspend fun markFailed(id: Long, error: String)
+
+    @Query("UPDATE pending_notification_uploads SET retry_count = retry_count + 1, last_error = :error WHERE id IN (:ids)")
+    suspend fun markFailed(ids: List<Long>, error: String)
 
     @Query("DELETE FROM pending_notification_uploads")
     suspend fun clear()

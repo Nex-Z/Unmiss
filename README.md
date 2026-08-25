@@ -79,8 +79,7 @@ cp .env.example .env        # 配置 DATABASE_URL / JWT_SECRET / AI_MODEL / AI_B
 # DEEPSEEK_API_KEY 只通过进程或系统环境变量提供，不写入仓库
 pnpm db:migrate             # 执行 Drizzle 迁移
 pnpm build
-pnpm start                  # API 监听 http://localhost:3000
-pnpm worker                 # 另开终端：AI 失败重试与原文清理
+pnpm start                  # API + AI Worker，监听 http://localhost:3000
 ```
 
 健康检查：
@@ -117,7 +116,8 @@ cd unmiss-android
 | POST | `/devices/register` | 设备注册，返回 JWT | ✅ 已实现 |
 | POST | `/devices/push-token` | 更新设备推送 Token | ✅ 服务端已实现 |
 | DELETE | `/devices/me/data` | 删除当前用户全部服务端数据 | ✅ 已实现 |
-| POST | `/notifications` | 上传通知（幂等） | ✅ 已实现 |
+| POST | `/notifications` | 上传单条通知（兼容旧客户端） | ✅ 已实现 |
+| POST | `/notifications/batch` | 批量上传最多 100 条通知（幂等） | ✅ 已实现 |
 | GET | `/reminders/pending` | 待处理提醒列表 | ✅ 已实现 |
 | POST | `/reminders/:id/done` | 标记完成 | ✅ 已实现 |
 | POST | `/reminders/:id/snooze` | 稍后提醒 | ✅ 已实现 |
@@ -130,7 +130,7 @@ cd unmiss-android
 - [x] **Phase 2** — 设备注册（JWT）、通知上传、幂等去重、WorkManager 重试
 - [x] **Phase 3** — DeepSeek V4 Flash 结构化分析、时区解析、并发领取与后台重试
 - [x] **Phase 4** — Reminder 生命周期 API（pending / done / snooze / ignore + events）
-- [x] **Phase 5** — Android 上传后立即同步、本地到点调度，15 分钟周期同步兜底
+- [x] **Phase 5** — Android 批量上传后定向同步、本地到点调度，1 小时低频同步兜底
 - [ ] **Phase 6** — FCM 服务端主动推送（MVP 不依赖，后续增强）
 - [x] **Phase 7** — 通知栏快捷操作（Done / Snooze / Ignore）全链路同步
 - [x] Docker Compose 使用外部 `DATABASE_URL`，API / Worker 路径已修正
@@ -144,7 +144,7 @@ cd unmiss-android
 - Worker 默认自动清理 14 天前通知原文（可通过 `NOTIFICATION_RETENTION_DAYS` 调整）
 - 不在日志中输出通知正文
 - 全部业务接口需要设备 JWT 认证
-- API 默认限制为每个设备/IP 每分钟 120 次请求，请求体限制为 64 KB
+- API 默认限制为每个设备/IP 每分钟 120 次请求；批量接口最多 100 条，请求体限制为 2 MB
 - 所有 Secret 通过 `.env` 管理，禁止提交到 Git
 
 详细设计见 [docs/Unmiss_PLAN.md](docs/Unmiss_PLAN.md) 第 30~32 节。

@@ -37,13 +37,14 @@ class ReminderSyncWorker(context: Context, params: WorkerParameters) :
     companion object {
         private const val PERIODIC_WORK = "unmiss-reminder-sync-periodic"
         private const val IMMEDIATE_WORK = "unmiss-reminder-sync-now"
-        private const val FOLLOW_UP_WORK = "unmiss-reminder-sync-follow-up"
+        private const val FAST_FOLLOW_UP_WORK = "unmiss-reminder-sync-follow-up-fast"
+        private const val SLOW_FOLLOW_UP_WORK = "unmiss-reminder-sync-follow-up-slow"
 
         fun schedule(context: Context) {
             val constraints = Constraints.Builder()
                 .setRequiredNetworkType(NetworkType.CONNECTED)
                 .build()
-            val periodic = PeriodicWorkRequestBuilder<ReminderSyncWorker>(15, TimeUnit.MINUTES)
+            val periodic = PeriodicWorkRequestBuilder<ReminderSyncWorker>(1, TimeUnit.HOURS)
                 .setConstraints(constraints)
                 .build()
             WorkManager.getInstance(context).enqueueUniquePeriodicWork(
@@ -62,16 +63,28 @@ class ReminderSyncWorker(context: Context, params: WorkerParameters) :
         }
 
         fun enqueueFollowUp(context: Context) {
-            val request = OneTimeWorkRequestBuilder<ReminderSyncWorker>()
+            val constraints = Constraints.Builder()
+                .setRequiredNetworkType(NetworkType.CONNECTED)
+                .build()
+            val fast = OneTimeWorkRequestBuilder<ReminderSyncWorker>()
                 .setConstraints(
-                    Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build(),
+                    constraints,
                 )
                 .setInitialDelay(60, TimeUnit.SECONDS)
                 .build()
+            val slow = OneTimeWorkRequestBuilder<ReminderSyncWorker>()
+                .setConstraints(constraints)
+                .setInitialDelay(10, TimeUnit.MINUTES)
+                .build()
             WorkManager.getInstance(context).enqueueUniqueWork(
-                FOLLOW_UP_WORK,
+                FAST_FOLLOW_UP_WORK,
                 ExistingWorkPolicy.REPLACE,
-                request,
+                fast,
+            )
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                SLOW_FOLLOW_UP_WORK,
+                ExistingWorkPolicy.REPLACE,
+                slow,
             )
         }
 

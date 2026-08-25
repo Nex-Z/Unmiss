@@ -68,7 +68,7 @@ fun UnmissNavHost() {
 
     LaunchedEffect(Unit) {
         runCatching { ServiceLocator.get().notificationRepository.ensureRegistered() }
-        UploadWorker.enqueue(navController.context)
+        UploadWorker.enqueueNow(navController.context)
     }
 
     LiquidGlassCanvas {

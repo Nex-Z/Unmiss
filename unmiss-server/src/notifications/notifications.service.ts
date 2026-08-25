@@ -1,17 +1,16 @@
 import { ForbiddenException, Injectable } from '@nestjs/common'
 import type { DevicePayload } from '../common/current-device.decorator'
-import { NotificationAnalysisService } from '../agent/notification-analysis.service'
 import {
   NotificationsRepository,
   type UpsertResult,
 } from './notifications.repository'
 import type { CreateNotificationDto } from './dto/create-notification.dto'
+import type { CreateNotificationsBatchDto } from './dto/create-notifications-batch.dto'
 
 @Injectable()
 export class NotificationsService {
   constructor(
     private readonly notificationsRepository: NotificationsRepository,
-    private readonly notificationAnalysisService: NotificationAnalysisService,
   ) {}
 
   async create(
@@ -32,8 +31,30 @@ export class NotificationsService {
       timezone: this.validTimezone(dto.timezone),
       postedAt: new Date(dto.postedAt),
     })
-    await this.notificationAnalysisService.analyzeById(result.notification.id)
     return result
+  }
+
+  async createBatch(
+    device: DevicePayload,
+    dto: CreateNotificationsBatchDto,
+  ): Promise<{ accepted: number; created: number }> {
+    if (dto.notifications.some((item) => item.deviceId !== device.deviceId)) {
+      throw new ForbiddenException('deviceId does not match token')
+    }
+    const created = await this.notificationsRepository.insertMany(
+      dto.notifications.map((item) => ({
+        userId: device.userId,
+        deviceId: item.deviceId,
+        notificationKey: item.notificationKey,
+        packageName: item.packageName,
+        title: item.title,
+        body: item.body,
+        subText: item.subText,
+        timezone: this.validTimezone(item.timezone),
+        postedAt: new Date(item.postedAt),
+      })),
+    )
+    return { accepted: dto.notifications.length, created }
   }
 
   private validTimezone(value?: string): string {

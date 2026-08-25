@@ -20,6 +20,11 @@ interface UnmissApi {
         @retrofit2.http.Body body: NotificationUploadRequest,
     ): retrofit2.Response<Unit>
 
+    @retrofit2.http.POST("notifications/batch")
+    suspend fun uploadNotifications(
+        @retrofit2.http.Body body: NotificationUploadBatchRequest,
+    ): retrofit2.Response<NotificationUploadBatchResponse>
+
     @retrofit2.http.GET("reminders/pending")
     suspend fun pendingReminders(): List<ReminderDto>
 

@@ -80,6 +80,38 @@ export class NotificationsRepository {
     return { notification: found, created: false }
   }
 
+  async insertMany(params: Array<{
+    userId: string
+    deviceId: string
+    notificationKey: string
+    packageName: string
+    title?: string
+    body?: string
+    subText?: string
+    timezone?: string
+    postedAt: Date
+  }>): Promise<number> {
+    if (params.length === 0) return 0
+    const inserted = await this.db
+      .insert(notifications)
+      .values(params.map((item) => ({
+        userId: item.userId,
+        deviceId: item.deviceId,
+        notificationKey: item.notificationKey,
+        packageName: item.packageName,
+        title: item.title ?? null,
+        body: item.body ?? null,
+        subText: item.subText ?? null,
+        timezone: item.timezone ?? 'UTC',
+        postedAt: item.postedAt,
+      })))
+      .onConflictDoNothing({
+        target: [notifications.deviceId, notifications.notificationKey],
+      })
+      .returning({ id: notifications.id })
+    return inserted.length
+  }
+
   private selection() {
     return {
       id: notifications.id,

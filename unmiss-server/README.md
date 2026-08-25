@@ -55,13 +55,15 @@ except `/api/v1/devices/register` and `/api/v1/health`.
 | POST   | `/api/v1/devices/push-token` | register or replace the authenticated device push token |
 | DELETE | `/api/v1/devices/me/data` | permanently delete the authenticated user's server data |
 | POST   | `/api/v1/notifications`     | body `{deviceId, notificationKey, packageName, title?, body?, subText?, postedAt}`, idempotent via `UNIQUE(device_id, notification_key)` |
+| POST   | `/api/v1/notifications/batch` | insert up to 100 notifications in one request; returns `{accepted, created}` |
 | GET    | `/api/v1/reminders/pending` | list pending reminders for the authenticated user |
 | POST   | `/api/v1/reminders/:id/done` | mark a reminder done |
 | POST   | `/api/v1/reminders/:id/snooze` | body `{remindAt}` → reschedule a reminder |
 | POST   | `/api/v1/reminders/:id/ignore` | ignore a reminder |
 
-Notifications are upserted with `onConflictDoNothing`; retries return the same
-row with `created: false`.
+Notifications use `onConflictDoNothing`; batch retries are safe and report how
+many rows were accepted versus newly created. HTTP requests return after the
+database write, while AI analysis runs asynchronously in the worker.
 
 When `AI_MODEL`, `DEEPSEEK_API_KEY` (or `AI_API_KEY`), and `AI_BASE_URL` are configured, notifications
 are analyzed through an OpenAI-compatible `chat/completions` endpoint. The

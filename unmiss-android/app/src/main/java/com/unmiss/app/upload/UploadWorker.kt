@@ -6,6 +6,7 @@ import androidx.work.Constraints
 import androidx.work.CoroutineWorker
 import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
+import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
@@ -41,44 +42,76 @@ class UploadWorker(
     override suspend fun doWork(): Result {
         val dao = ServiceLocator.get().pendingDao
         val repository = ServiceLocator.get().notificationRepository
+        var uploadedAny = false
         return try {
-            val pending = dao.pending(50)
-            var uploadedAny = false
-            for (entry in pending) {
+            var processedBatches = 0
+            while (processedBatches < MAX_BATCHES_PER_RUN) {
+                val entries = dao.pending(BATCH_SIZE)
+                if (entries.isEmpty()) break
+                processedBatches += 1
                 try {
-                    repository.upload(entry)
-                    dao.markUploaded(entry.id, System.currentTimeMillis())
+                    repository.uploadBatch(entries)
+                    dao.markUploaded(entries.map { it.id }, System.currentTimeMillis())
                     uploadedAny = true
-                } catch (e: Exception) {
-                    dao.markFailed(entry.id, e.message ?: e.javaClass.simpleName)
+                } catch (error: Exception) {
+                    dao.markFailed(
+                        entries.map { it.id },
+                        error.message ?: error.javaClass.simpleName,
+                    )
+                    return Result.retry()
                 }
+                if (entries.size < BATCH_SIZE) break
             }
             if (uploadedAny) {
                 ReminderSyncWorker.enqueueNow(applicationContext)
                 ReminderSyncWorker.enqueueFollowUp(applicationContext)
             }
-            // Keep a useful local audit trail while bounding the database size.
             dao.deleteUploadedBefore(System.currentTimeMillis() - 90L * 24 * 60 * 60 * 1000)
-            if (dao.pending(50).isEmpty()) Result.success() else Result.retry()
-        } catch (e: Exception) {
+            if (dao.pending(1).isNotEmpty()) enqueueContinuation(applicationContext)
+            Result.success()
+        } catch (_: Exception) {
             Result.retry()
         }
     }
 
     companion object {
         const val UNIQUE_WORK_NAME = "unmiss-notification-upload"
+        private const val BATCH_SIZE = 100
+        private const val MAX_BATCHES_PER_RUN = 5
 
         fun enqueue(context: Context) {
-            val request = OneTimeWorkRequestBuilder<UploadWorker>()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.KEEP,
+                request(initialDelaySeconds = 5),
+            )
+        }
+
+        fun enqueueNow(context: Context) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.REPLACE,
+                request(initialDelaySeconds = 0),
+            )
+        }
+
+        private fun enqueueContinuation(context: Context) {
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                UNIQUE_WORK_NAME,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
+                request(initialDelaySeconds = 0),
+            )
+        }
+
+        private fun request(initialDelaySeconds: Long): OneTimeWorkRequest =
+            OneTimeWorkRequestBuilder<UploadWorker>()
                 .setConstraints(
                     Constraints.Builder()
                         .setRequiredNetworkType(NetworkType.CONNECTED)
                         .build(),
                 )
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
+                .setInitialDelay(initialDelaySeconds, TimeUnit.SECONDS)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .build()
-            WorkManager.getInstance(context)
-                .enqueueUniqueWork(UNIQUE_WORK_NAME, ExistingWorkPolicy.APPEND_OR_REPLACE, request)
-        }
     }
 }

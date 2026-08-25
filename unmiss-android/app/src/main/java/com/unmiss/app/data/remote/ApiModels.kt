@@ -35,6 +35,17 @@ data class NotificationUploadRequest(
 )
 
 @Serializable
+data class NotificationUploadBatchRequest(
+    val notifications: List<NotificationUploadRequest>,
+)
+
+@Serializable
+data class NotificationUploadBatchResponse(
+    val accepted: Int,
+    val created: Int,
+)
+
+@Serializable
 data class DeleteDataResponse(val deleted: Boolean)
 
 @Serializable
