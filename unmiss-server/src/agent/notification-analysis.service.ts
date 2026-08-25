@@ -45,7 +45,7 @@ export class NotificationAnalysisService {
 
       const notifications = await this.analysisRepository.claimForUser(
         schedule.userId,
-        new Date(now.getTime() - 30 * 60_000),
+        now,
         300,
       )
       try {
