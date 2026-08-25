@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
 import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
-import { notifications, reminders, users } from '../database/schema'
+import { notifications, reminderEvents, reminders, users } from '../database/schema'
 import type { NotificationRow } from '../notifications/notifications.repository'
 import type { NotificationAnalysis } from './notification-analysis.schema'
 import type { NotificationDigest } from './notification-analysis.schema'
@@ -142,6 +142,25 @@ export class AnalysisRepository {
       .where(eq(users.id, userId))
   }
 
+  async activeReminders(userId: string) {
+    return this.db
+      .select({
+        id: reminders.id,
+        title: reminders.title,
+        description: reminders.description,
+        status: reminders.status,
+        quadrant: reminders.quadrant,
+        remindAt: reminders.remindAt,
+      })
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.userId, userId),
+          inArray(reminders.status, ['candidate', 'pending']),
+        ),
+      )
+  }
+
   async release(id: string): Promise<void> {
     await this.db
       .update(notifications)
@@ -189,7 +208,8 @@ export class AnalysisRepository {
         title: item.title,
         description: item.description ?? null,
         reason: item.reason,
-        importance: item.importance,
+        importance: quadrantImportance(item.quadrant),
+        quadrant: item.quadrant,
         status: 'candidate',
         remindAt: new Date(item.remindAt),
       }))
@@ -200,6 +220,50 @@ export class AnalysisRepository {
           .insert(reminders)
           .values(reminderValues)
           .onConflictDoNothing({ target: reminders.sourceNotificationId })
+      }
+      for (const action of digest.updates) {
+        const terminal = action.action === 'complete' || action.action === 'ignore'
+        const [updated] = await tx
+          .update(reminders)
+          .set(
+            terminal
+              ? {
+                  status: action.action === 'complete' ? 'done' : 'ignored',
+                  completedAt: action.action === 'complete' ? new Date() : null,
+                  reason: action.reason,
+                  updatedAt: new Date(),
+                }
+              : {
+                  ...(action.title ? { title: action.title } : {}),
+                  ...(action.description !== undefined
+                    ? { description: action.description }
+                    : {}),
+                  ...(action.quadrant
+                    ? {
+                        quadrant: action.quadrant,
+                        importance: quadrantImportance(action.quadrant),
+                      }
+                    : {}),
+                  ...(action.remindAt ? { remindAt: new Date(action.remindAt) } : {}),
+                  reason: action.reason,
+                  updatedAt: new Date(),
+                },
+          )
+          .where(
+            and(
+              eq(reminders.id, action.reminderId),
+              eq(reminders.userId, userId),
+              inArray(reminders.status, ['candidate', 'pending']),
+            ),
+          )
+          .returning({ id: reminders.id })
+        if (updated) {
+          await tx.insert(reminderEvents).values({
+            reminderId: updated.id,
+            type: `agent_${action.action}`,
+            metadata: { reason: action.reason },
+          })
+        }
       }
       await tx
         .update(notifications)
@@ -236,6 +300,15 @@ export class AnalysisRepository {
       receivedAt: notifications.receivedAt,
     }
   }
+}
+
+function quadrantImportance(quadrant: string): number {
+  return {
+    important_urgent: 4,
+    important_not_urgent: 3,
+    not_important_urgent: 2,
+    not_important_not_urgent: 1,
+  }[quadrant] ?? 1
 }
 
 export function normalizeNotificationRow(row: Record<string, unknown>): NotificationRow {

@@ -115,4 +115,54 @@ describe('Worker behavior (e2e)', () => {
     expect(notificationAfter).toHaveLength(0)
     expect(reminderAfter?.sourceNotificationId).toBeNull()
   })
+
+  it('creates a quadrant candidate and completes an existing item from later evidence', async () => {
+    const identity = await createIdentity()
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        ...identity,
+        notificationKey: `digest-${Date.now()}`,
+        packageName: 'test',
+        body: 'later segment evidence',
+        timezone: 'Asia/Hong_Kong',
+        postedAt: new Date(),
+      })
+      .returning({ id: notifications.id })
+    notificationIds.push(notification!.id)
+    const [existing] = await db
+      .insert(reminders)
+      .values({
+        userId: identity.userId,
+        title: 'Old candidate',
+        status: 'candidate',
+        remindAt: new Date(Date.now() + 60_000),
+      })
+      .returning({ id: reminders.id })
+    reminderIds.push(existing!.id)
+
+    await analysisRepository.saveDigest(identity.userId, [notification!.id], {
+      reminders: [{
+        sourceNotificationId: notification!.id,
+        title: 'Plan the report',
+        reason: 'explicit unfinished request',
+        quadrant: 'important_not_urgent',
+        remindAt: new Date(Date.now() + 3_600_000).toISOString(),
+      }],
+      updates: [{
+        reminderId: existing!.id,
+        action: 'complete',
+        reason: 'later notification explicitly says it was submitted',
+      }],
+    })
+
+    const rows = await db
+      .select()
+      .from(reminders)
+      .where(inArray(reminders.userId, [identity.userId]))
+    reminderIds.push(...rows.map((row) => row.id).filter((id) => id !== existing!.id))
+    expect(rows.find((row) => row.id === existing!.id)?.status).toBe('done')
+    expect(rows.find((row) => row.sourceNotificationId === notification!.id)?.quadrant)
+      .toBe('important_not_urgent')
+  })
 })

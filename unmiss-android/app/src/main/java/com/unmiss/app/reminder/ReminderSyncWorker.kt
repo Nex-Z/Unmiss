@@ -19,15 +19,22 @@ class ReminderSyncWorker(context: Context, params: WorkerParameters) :
     CoroutineWorker(context, params) {
 
     override suspend fun doWork(): Result = try {
+        val previousIds = ServiceLocator.get().reminderDao.activeOnce().map { it.id }.toSet()
         val reminders = ServiceLocator.get().reminderRepository.sync()
+        val activeIds = reminders.map { it.id }.toSet()
+        (previousIds - activeIds).forEach { id ->
+            ReminderDisplayWorker.cancel(applicationContext, id)
+        }
         reminders.forEach { reminder ->
-            ReminderDisplayWorker.schedule(
-                applicationContext,
-                reminder.id,
-                Duration.between(Instant.now(), Instant.parse(reminder.remindAt))
-                    .toMillis()
-                    .coerceAtLeast(0),
-            )
+            if (reminder.status == "pending") {
+                ReminderDisplayWorker.schedule(
+                    applicationContext,
+                    reminder.id,
+                    Duration.between(Instant.now(), Instant.parse(reminder.remindAt))
+                        .toMillis()
+                        .coerceAtLeast(0),
+                )
+            }
         }
         Result.success()
     } catch (_: Exception) {

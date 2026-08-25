@@ -1,0 +1,1 @@
+ALTER TABLE "reminders" ADD COLUMN "quadrant" text DEFAULT 'important_not_urgent' NOT NULL;

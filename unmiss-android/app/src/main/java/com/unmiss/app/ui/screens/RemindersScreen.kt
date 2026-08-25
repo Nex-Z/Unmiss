@@ -101,25 +101,39 @@ fun RemindersScreen() {
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
-                    items(reminders, key = { it.id }) { reminder ->
-                        ReminderItem(
-                            reminder = reminder,
-                            onDone = { runAction { repository.done(reminder.id) } },
-                            onConfirm = {
-                                runAction {
-                                    repository.confirm(reminder.id, Instant.now().plusSeconds(3600))
-                                    ReminderDisplayWorker.schedule(context, reminder.id, 3_600_000)
-                                }
-                            },
-                            onSnooze = {
-                                runAction {
-                                    repository.snooze(reminder.id, Instant.now().plusSeconds(3600))
-                                    ReminderDisplayWorker.schedule(context, reminder.id, 3_600_000)
-                                }
-                            },
-                            onIgnore = { runAction { repository.ignore(reminder.id) } },
-                        )
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
+                    QUADRANTS.forEach { quadrant ->
+                        val group = reminders.filter { it.quadrant == quadrant.id }
+                        if (group.isNotEmpty()) {
+                            item(key = "header-${quadrant.id}") {
+                                Text(
+                                    quadrant.label,
+                                    modifier = Modifier.padding(top = 18.dp, bottom = 8.dp),
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = quadrant.color,
+                                )
+                            }
+                            items(group, key = { it.id }) { reminder ->
+                                ReminderItem(
+                                    reminder = reminder,
+                                    quadrant = quadrant,
+                                    onDone = { runAction { repository.done(reminder.id) } },
+                                    onConfirm = {
+                                        runAction {
+                                            repository.confirm(reminder.id, Instant.now().plusSeconds(3600))
+                                            ReminderDisplayWorker.schedule(context, reminder.id, 3_600_000)
+                                        }
+                                    },
+                                    onSnooze = {
+                                        runAction {
+                                            repository.snooze(reminder.id, Instant.now().plusSeconds(3600))
+                                            ReminderDisplayWorker.schedule(context, reminder.id, 3_600_000)
+                                        }
+                                    },
+                                    onIgnore = { runAction { repository.ignore(reminder.id) } },
+                                )
+                                HorizontalDivider(color = quadrant.color.copy(alpha = 0.18f))
+                            }
+                        }
                     }
                 }
             }
@@ -130,16 +144,35 @@ fun RemindersScreen() {
 @Composable
 private fun ReminderItem(
     reminder: LocalReminder,
+    quadrant: QuadrantStyle,
     onDone: () -> Unit,
     onConfirm: () -> Unit,
     onSnooze: () -> Unit,
     onIgnore: () -> Unit,
 ) {
     Column(
-        modifier = Modifier.fillMaxWidth().background(Color.White.copy(alpha = 0.82f)).padding(horizontal = 16.dp, vertical = 16.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(quadrant.color.copy(alpha = 0.075f))
+            .padding(horizontal = 16.dp, vertical = 16.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        Text(reminder.title, style = MaterialTheme.typography.titleMedium)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                reminder.title,
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.titleMedium,
+            )
+            Text(
+                quadrant.shortLabel,
+                style = MaterialTheme.typography.labelSmall,
+                color = quadrant.color,
+            )
+        }
         reminder.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
         if (reminder.status == "candidate") {
             Text(
@@ -171,3 +204,17 @@ private fun formatTime(value: String): String = runCatching {
         .withZone(ZoneId.systemDefault())
         .format(Instant.parse(value))
 }.getOrDefault(value)
+
+private data class QuadrantStyle(
+    val id: String,
+    val label: String,
+    val shortLabel: String,
+    val color: Color,
+)
+
+private val QUADRANTS = listOf(
+    QuadrantStyle("important_urgent", "重要且紧急", "立即关注", Color(0xFFC94F58)),
+    QuadrantStyle("important_not_urgent", "重要但不紧急", "重点安排", Color(0xFF3D6FA8)),
+    QuadrantStyle("not_important_urgent", "紧急但不重要", "快速处理", Color(0xFFB97824)),
+    QuadrantStyle("not_important_not_urgent", "不重要且不紧急", "低优先级", Color(0xFF6D7480)),
+)

@@ -68,6 +68,7 @@ data class ReminderDto(
     val description: String? = null,
     val reason: String? = null,
     val importance: Int? = null,
+    val quadrant: String = "important_not_urgent",
     val status: String,
     @SerialName("remindAt") val remindAt: String,
 )

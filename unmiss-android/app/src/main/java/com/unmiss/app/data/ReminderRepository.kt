@@ -74,6 +74,7 @@ private fun ReminderDto.toLocal(displayedAt: Long?): LocalReminder = LocalRemind
     description = description,
     reason = reason,
     importance = importance,
+    quadrant = quadrant,
     status = status,
     remindAt = remindAt,
     displayedAt = displayedAt,

@@ -73,6 +73,12 @@ class ReminderDisplayWorker(context: Context, params: WorkerParameters) :
             )
         }
 
+        fun cancel(context: Context, reminderId: String) {
+            WorkManager.getInstance(context)
+                .cancelUniqueWork("unmiss-reminder-display-$reminderId")
+            NotificationManagerCompat.from(context).cancel(reminderId.hashCode())
+        }
+
         private fun ensureChannel(context: Context) {
             val manager = context.getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(

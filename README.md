@@ -53,6 +53,8 @@ NestJS API（幂等入库 PostgreSQL）
     ↓
 DeepSeek 整体梳理该时段，结合后续通知去重并排除已完成事项
     ↓
+按四象限标注优先级，并更新、完成或作废已有遗漏事项
+    ↓
 Android 展示“可能遗漏”，用户确认后才成为正式 Reminder
     ↓
 WorkManager 到点弹出提醒：[已完成] [稍后提醒] [忽略]

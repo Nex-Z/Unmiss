@@ -93,6 +93,7 @@ export const reminders = pgTable(
     description: text('description'),
     reason: text('reason'),
     importance: smallint('importance'),
+    quadrant: text('quadrant').notNull().default('important_not_urgent'),
     status: text('status').notNull().default('pending'),
     remindAt: timestamp('remind_at', { withTimezone: true }).notNull(),
     lastShownAt: timestamp('last_shown_at', { withTimezone: true }),

@@ -50,8 +50,12 @@ export class NotificationAnalysisService {
       )
       try {
         if (notifications.length > 0) {
+          const activeReminders = await this.analysisRepository.activeReminders(
+            schedule.userId,
+          )
           const digest = await this.digestNotifications(
             notifications,
+            activeReminders,
             schedule.timezone,
             now,
           )
@@ -76,6 +80,7 @@ export class NotificationAnalysisService {
 
   private async digestNotifications(
     notifications: NotificationRow[],
+    activeReminders: Awaited<ReturnType<AnalysisRepository['activeReminders']>>,
     timezone: string,
     now: Date,
   ): Promise<NotificationDigest> {
@@ -84,6 +89,7 @@ export class NotificationAnalysisService {
       digests.push(
         await this.requestDigest({
           notifications: notifications.slice(offset, offset + 50).map(toPromptItem),
+          existingReminders: activeReminders.map(toPromptReminder),
           timezone,
           currentTime: now.toISOString(),
         }),
@@ -92,6 +98,8 @@ export class NotificationAnalysisService {
     if (digests.length === 1) return digests[0]!
     return this.requestDigest({
       candidateReminders: digests.flatMap((digest) => digest.reminders),
+      candidateUpdates: digests.flatMap((digest) => digest.updates),
+      existingReminders: activeReminders.map(toPromptReminder),
       timezone,
       currentTime: now.toISOString(),
       instruction: 'Deduplicate and consolidate these candidates across the full segment.',
@@ -185,15 +193,33 @@ function toPromptItem(notification: NotificationRow) {
   }
 }
 
-const SYSTEM_PROMPT = `You review a time segment of Android notifications to find
-secondary-important, secondary-urgent obligations the user may have overlooked while
-busy. Analyze the segment as a whole. Use later notifications to infer completion,
-supersession, or duplication. Prefer precision: exclude urgent alerts, OTPs, ads, news,
-likes, recommendations, FYI messages, ordinary chat, and anything with evidence that
-it was completed. Never invent an obligation or deadline.
+function toPromptReminder(reminder: Awaited<ReturnType<AnalysisRepository['activeReminders']>>[number]) {
+  return {
+    id: reminder.id,
+    title: reminder.title,
+    description: reminder.description,
+    status: reminder.status,
+    quadrant: reminder.quadrant,
+    remindAt: reminder.remindAt.toISOString(),
+  }
+}
 
-Return JSON only as {"reminders":[]}. Each reminder must contain sourceNotificationId,
-title, optional description, reason, importance (1-5), and an absolute ISO 8601
-remindAt in the supplied timezone. sourceNotificationId must be an input id. Merge
-duplicates into one reminder. remindAt must be after currentTime; when no explicit
-deadline exists, use 09:00 local time on the next day.`
+const SYSTEM_PROMPT = `You review a time segment of Android notifications to find
+obligations the user may have overlooked while busy. Analyze the segment as a whole
+and compare it with existingReminders. Use later notifications as evidence of changes,
+completion, cancellation, supersession, or duplication. Prefer precision: exclude OTPs,
+ads, news, likes, recommendations, FYI messages, and ordinary chat. Never invent an
+obligation, completion, or deadline.
+
+Classify every new or updated item into exactly one Eisenhower quadrant:
+important_urgent, important_not_urgent, not_important_urgent, or
+not_important_not_urgent.
+
+Return JSON only as {"reminders":[],"updates":[]}. New reminders contain
+sourceNotificationId, title, optional description, reason, quadrant, and absolute ISO
+8601 remindAt. sourceNotificationId must be an input notification id. Updates contain
+reminderId, action (update, complete, or ignore), reason, and optional changed fields.
+Only complete or ignore an existing reminder when a later notification is explicit,
+high-confidence evidence. Use update for changed time, content, or quadrant. Do not
+repeat an existing reminder as new. Merge duplicates. remindAt must be after
+currentTime; without an explicit deadline, use 09:00 local time on the next day.`

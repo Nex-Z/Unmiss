@@ -34,6 +34,7 @@ data class LocalReminder(
     val description: String?,
     val reason: String?,
     val importance: Int?,
+    val quadrant: String = "important_not_urgent",
     val status: String,
     @ColumnInfo(name = "remind_at") val remindAt: String,
     @ColumnInfo(name = "displayed_at") val displayedAt: Long? = null,
@@ -104,6 +105,9 @@ interface ReminderDao {
     @Query("SELECT * FROM reminders WHERE status IN ('candidate', 'pending') ORDER BY remind_at ASC")
     fun observePending(): kotlinx.coroutines.flow.Flow<List<LocalReminder>>
 
+    @Query("SELECT * FROM reminders WHERE status IN ('candidate', 'pending')")
+    suspend fun activeOnce(): List<LocalReminder>
+
     @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
     suspend fun find(id: String): LocalReminder?
 
@@ -128,7 +132,7 @@ interface ReminderDao {
 
 @Database(
     entities = [PendingNotificationUpload::class, LocalReminder::class],
-    version = 3,
+    version = 4,
     exportSchema = false,
 )
 abstract class UnmissDatabase : RoomDatabase() {
@@ -143,6 +147,14 @@ abstract class UnmissDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE pending_notification_uploads ADD COLUMN body TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE pending_notification_uploads ADD COLUMN posted_at INTEGER NOT NULL DEFAULT 0")
                 db.execSQL("UPDATE pending_notification_uploads SET posted_at = created_at WHERE posted_at = 0")
+            }
+        }
+
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    "ALTER TABLE reminders ADD COLUMN quadrant TEXT NOT NULL DEFAULT 'important_not_urgent'",
+                )
             }
         }
     }

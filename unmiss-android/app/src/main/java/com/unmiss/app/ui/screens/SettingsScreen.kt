@@ -3,6 +3,7 @@ package com.unmiss.app.ui.screens
 import android.app.TimePickerDialog
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -85,13 +86,18 @@ fun SettingsScreen(onBack: () -> Unit) {
         }
     }
 
-    fun showTimePicker() {
-        val initial = LocalTime.now().plusHours(1)
+    fun showTimePicker(current: String? = null) {
+        val initial = current?.let {
+            runCatching { LocalTime.parse(it) }.getOrNull()
+        } ?: LocalTime.now().plusHours(1)
         TimePickerDialog(
             context,
             { _, hour, minute ->
                 val value = "%02d:%02d".format(hour, minute)
-                saveAnalysisTimes(analysisTimes + value)
+                saveAnalysisTimes(
+                    if (current == null) analysisTimes + value
+                    else analysisTimes.map { if (it == current) value else it },
+                )
             },
             initial.hour,
             initial.minute,
@@ -175,12 +181,12 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 fontWeight = FontWeight.SemiBold,
                             )
                             Text(
-                                "只在这些时间梳理可能遗漏的非紧急事项",
+                                "每个时刻整理上一时段；点击时间可修改",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
-                        IconButton(enabled = !scheduleSaving, onClick = ::showTimePicker) {
+                        IconButton(enabled = !scheduleSaving, onClick = { showTimePicker() }) {
                             Icon(Icons.Default.Add, contentDescription = "添加归纳时间")
                         }
                     }
@@ -200,12 +206,25 @@ fun SettingsScreen(onBack: () -> Unit) {
                                 contentDescription = null,
                                 tint = MaterialTheme.colorScheme.primary,
                             )
-                            Text(
-                                time,
-                                modifier = Modifier.weight(1f).padding(start = 14.dp),
-                                style = MaterialTheme.typography.headlineSmall,
-                                fontWeight = FontWeight.Medium,
-                            )
+                            Column(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .padding(start = 14.dp)
+                                    .clickable(enabled = !scheduleSaving) {
+                                        showTimePicker(time)
+                                    },
+                            ) {
+                                Text(
+                                    time,
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Medium,
+                                )
+                                Text(
+                                    analysisWindowLabel(analysisTimes, index),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             IconButton(
                                 enabled = analysisTimes.size > 1 && !scheduleSaving,
                                 onClick = { saveAnalysisTimes(analysisTimes - time) },
@@ -304,4 +323,12 @@ private fun nextAnalysisTime(times: List<String>): String {
     }.sorted()
     val today = parsed.firstOrNull { it.isAfter(now) }
     return if (today != null) today.format(formatter) else "明天 ${parsed.first().format(formatter)}"
+}
+
+private fun analysisWindowLabel(times: List<String>, index: Int): String {
+    if (times.size == 1) return "过去 24 小时"
+    val previous = if (index == 0) times.last() else times[index - 1]
+    val current = times[index]
+    val overnight = if (previous > current) " · 跨夜" else ""
+    return "$previous → $current$overnight"
 }
