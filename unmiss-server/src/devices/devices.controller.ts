@@ -1,10 +1,11 @@
-import { Body, Controller, Delete, Post } from '@nestjs/common'
+import { Body, Controller, Delete, Get, Put, Post } from '@nestjs/common'
 import { CurrentDevice, type DevicePayload } from '../common/current-device.decorator'
 import { Public } from '../common/public.decorator'
 import type { RegisterDeviceResult } from './devices.service'
 import { DevicesService } from './devices.service'
 import { RegisterDeviceDto } from './dto/register-device.dto'
 import { UpdatePushTokenDto } from './dto/update-push-token.dto'
+import { UpdateAnalysisScheduleDto } from './dto/update-analysis-schedule.dto'
 
 @Controller('devices')
 export class DevicesController {
@@ -25,6 +26,19 @@ export class DevicesController {
   ): Promise<{ updated: true }> {
     await this.devicesService.updatePushToken(device.deviceId, dto.pushToken)
     return { updated: true }
+  }
+
+  @Get('me/analysis-schedule')
+  analysisSchedule(@CurrentDevice() device: DevicePayload) {
+    return this.devicesService.analysisSchedule(device.userId)
+  }
+
+  @Put('me/analysis-schedule')
+  updateAnalysisSchedule(
+    @CurrentDevice() device: DevicePayload,
+    @Body() dto: UpdateAnalysisScheduleDto,
+  ) {
+    return this.devicesService.updateAnalysisSchedule(device.userId, dto)
   }
 
   @Delete('me/data')

@@ -36,14 +36,18 @@ export class WorkerSchedulerService implements OnApplicationShutdown {
 
   private async processNotifications(): Promise<void> {
     try {
-      const count = await this.analysisService.processPending()
-      if (count > 0) this.logger.log(`processed ${count} pending notifications`)
+      const result = await this.analysisService.processDueSchedules()
+      if (result.users > 0) {
+        this.logger.log(
+          `digested ${result.notifications} notifications for ${result.users} user(s)`,
+        )
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'unknown error'
       this.logger.error(`notification processing failed: ${message}`)
     } finally {
       if (this.running) {
-        this.analysisTimer = setTimeout(() => void this.processNotifications(), 10_000)
+        this.analysisTimer = setTimeout(() => void this.processNotifications(), 30_000)
       }
     }
   }

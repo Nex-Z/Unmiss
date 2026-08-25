@@ -12,7 +12,7 @@ class ReminderRepository(private val container: AppContainer) {
     val pending = container.reminderDao.observePending()
 
     suspend fun sync(): List<LocalReminder> = authenticatedCall { api ->
-        val remote = api.pendingReminders()
+        val remote = api.reminderInbox()
         val local = remote.map { dto -> dto.toLocal(container.reminderDao.find(dto.id)?.displayedAt) }
         if (local.isEmpty()) {
             container.reminderDao.deleteAllPending()
@@ -35,6 +35,11 @@ class ReminderRepository(private val container: AppContainer) {
 
     suspend fun snooze(id: String, remindAt: Instant) = authenticatedCall { api ->
         val updated = api.snoozeReminder(id, SnoozeReminderRequest(remindAt.toString()))
+        container.reminderDao.upsertAll(listOf(updated.toLocal(displayedAt = null)))
+    }
+
+    suspend fun confirm(id: String, remindAt: Instant) = authenticatedCall { api ->
+        val updated = api.confirmReminder(id, SnoozeReminderRequest(remindAt.toString()))
         container.reminderDao.upsertAll(listOf(updated.toLocal(displayedAt = null)))
     }
 

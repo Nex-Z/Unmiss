@@ -12,6 +12,12 @@ export interface DeviceRow {
   lastSeenAt: Date | null
 }
 
+export interface AnalysisScheduleRow {
+  times: string[]
+  timezone: string
+  lastRunAt: Date | null
+}
+
 @Injectable()
 export class DevicesRepository {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
@@ -77,6 +83,42 @@ export class DevicesRepository {
       .update(devices)
       .set({ pushToken, lastSeenAt: new Date() })
       .where(eq(devices.id, id))
+  }
+
+  async analysisSchedule(userId: string): Promise<AnalysisScheduleRow> {
+    const [row] = await this.db
+      .select({
+        times: users.analysisTimes,
+        timezone: users.analysisTimezone,
+        lastRunAt: users.analysisLastRunAt,
+      })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    if (!row) throw new Error('user not found')
+    return row
+  }
+
+  async updateAnalysisSchedule(
+    userId: string,
+    times: string[],
+    timezone: string,
+  ): Promise<AnalysisScheduleRow> {
+    const [row] = await this.db
+      .update(users)
+      .set({
+        analysisTimes: [...new Set(times)].sort(),
+        analysisTimezone: timezone,
+        analysisProcessingAt: null,
+      })
+      .where(eq(users.id, userId))
+      .returning({
+        times: users.analysisTimes,
+        timezone: users.analysisTimezone,
+        lastRunAt: users.analysisLastRunAt,
+      })
+    if (!row) throw new Error('user not found')
+    return row
   }
 
   async deleteUserData(userId: string): Promise<void> {

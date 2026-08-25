@@ -49,9 +49,11 @@ Room 本地队列（离线可靠暂存，WorkManager 自动重试）
     ↓ HTTPS
 NestJS API（幂等入库 PostgreSQL）
     ↓
-DeepSeek V4 Flash 判断是否形成待办 / 提醒时间
+用户设置的每日归纳时刻到达（可设置多个，按本地时区）
     ↓
-Android 在上传成功后立即同步 Reminder（周期同步兜底）
+DeepSeek 整体梳理该时段，结合后续通知去重并排除已完成事项
+    ↓
+Android 展示“可能遗漏”，用户确认后才成为正式 Reminder
     ↓
 WorkManager 到点弹出提醒：[已完成] [稍后提醒] [忽略]
     ↓
@@ -104,7 +106,7 @@ cd unmiss-android
 2. 首页引导授予 **通知使用权**（Notification Access）
 3. 在 **Allowlist 页** 勾选允许采集的 App（如微信、短信、邮箱）
 
-之后这些 App 的通知会被自动上传，等待 Agent 分析生成提醒。
+之后这些 App 的通知会被自动上传，在用户选择的归纳时刻统一梳理。
 
 ## REST API 一览
 
@@ -118,7 +120,10 @@ cd unmiss-android
 | DELETE | `/devices/me/data` | 删除当前用户全部服务端数据 | ✅ 已实现 |
 | POST | `/notifications` | 上传单条通知（兼容旧客户端） | ✅ 已实现 |
 | POST | `/notifications/batch` | 批量上传最多 100 条通知（幂等） | ✅ 已实现 |
+| GET/PUT | `/devices/me/analysis-schedule` | 查询或设置多个每日归纳时刻 | ✅ 已实现 |
+| GET | `/reminders/inbox` | 可能遗漏与正式提醒列表 | ✅ 已实现 |
 | GET | `/reminders/pending` | 待处理提醒列表 | ✅ 已实现 |
+| POST | `/reminders/:id/confirm` | 将可能遗漏确认为正式提醒 | ✅ 已实现 |
 | POST | `/reminders/:id/done` | 标记完成 | ✅ 已实现 |
 | POST | `/reminders/:id/snooze` | 稍后提醒 | ✅ 已实现 |
 | POST | `/reminders/:id/ignore` | 忽略 | ✅ 已实现 |

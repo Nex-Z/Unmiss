@@ -66,13 +66,27 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    val analysisTimes: Flow<Set<String>> = context.dataStore.data.map { prefs ->
+        prefs[ANALYSIS_TIMES_KEY] ?: setOf(DEFAULT_ANALYSIS_TIME)
+    }
+
+    suspend fun analysisTimesOnce(): Set<String> = analysisTimes.first()
+
+    suspend fun setAnalysisTimes(times: Set<String>) {
+        context.dataStore.edit { prefs ->
+            prefs[ANALYSIS_TIMES_KEY] = times
+        }
+    }
+
     companion object {
         const val DEFAULT_BASE_URL = "http://10.0.2.2:3000/api/v1"
 
         private val ENABLED_PACKAGES_KEY = stringSetPreferencesKey("enabled_packages")
         private val BASE_URL_KEY = stringPreferencesKey("base_url")
         private val CAPTURE_ENABLED_KEY = booleanPreferencesKey("capture_enabled")
+        private val ANALYSIS_TIMES_KEY = stringSetPreferencesKey("analysis_times")
         private val ALLOWLIST_INITIALIZED_KEY = booleanPreferencesKey("allowlist_initialized")
+        const val DEFAULT_ANALYSIS_TIME = "22:00"
 
         private val DEFAULT_COMMUNICATION_PACKAGES = setOf(
             "com.tencent.mm",

@@ -22,6 +22,20 @@
       "when": 1787495974857,
       "tag": "0002_supreme_cannonball",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1787671089205,
+      "tag": "0003_panoramic_ego",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1787671382718,
+      "tag": "0004_parallel_centennial",
+      "breakpoints": true
     }
   ]
 }

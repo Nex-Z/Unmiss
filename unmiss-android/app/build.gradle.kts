@@ -10,17 +10,20 @@ android {
     namespace = "com.unmiss.app"
     compileSdk = 36
 
+    val releaseStorePassword = System.getenv("UNMISS_KEYSTORE_PASSWORD")
+    val releaseKeyPassword = System.getenv("UNMISS_KEY_PASSWORD")
+
     signingConfigs {
-        create("release") {
-            storeFile = rootProject.file("keystore/unmiss-release.jks")
-            storePassword = System.getenv("UNMISS_KEYSTORE_PASSWORD")
-                ?: error("UNMISS_KEYSTORE_PASSWORD is required")
-            keyAlias = "unmiss"
-            keyPassword = System.getenv("UNMISS_KEY_PASSWORD")
-                ?: error("UNMISS_KEY_PASSWORD is required")
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
+        if (releaseStorePassword != null && releaseKeyPassword != null) {
+            create("release") {
+                storeFile = rootProject.file("keystore/unmiss-release.jks")
+                storePassword = releaseStorePassword
+                keyAlias = "unmiss"
+                keyPassword = releaseKeyPassword
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
+            }
         }
     }
 
@@ -28,21 +31,21 @@ android {
         applicationId = "com.unmiss.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 12
-        versionName = "0.2.0"
+        versionCode = 13
+        versionName = "0.3.0"
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         create("compat") {
             initWith(getByName("release"))
             applicationIdSuffix = ".compat"
             versionNameSuffix = "-compat"
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
 

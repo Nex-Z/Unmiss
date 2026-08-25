@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, inArray } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
 import { reminderEvents, reminders } from '../database/schema'
 
@@ -14,6 +14,19 @@ export class RemindersRepository {
       .select()
       .from(reminders)
       .where(and(eq(reminders.userId, userId), eq(reminders.status, 'pending')))
+      .orderBy(asc(reminders.remindAt))
+  }
+
+  async inboxForUser(userId: string): Promise<ReminderRow[]> {
+    return this.db
+      .select()
+      .from(reminders)
+      .where(
+        and(
+          eq(reminders.userId, userId),
+          inArray(reminders.status, ['candidate', 'pending']),
+        ),
+      )
       .orderBy(asc(reminders.remindAt))
   }
 
@@ -43,7 +56,7 @@ export class RemindersRepository {
           and(
             eq(reminders.id, params.id),
             eq(reminders.userId, params.userId),
-            eq(reminders.status, 'pending'),
+            inArray(reminders.status, ['candidate', 'pending']),
           ),
         )
         .returning()
@@ -85,6 +98,37 @@ export class RemindersRepository {
       await tx.insert(reminderEvents).values({
         reminderId: reminder.id,
         type: 'snoozed',
+        metadata: { remindAt: params.remindAt.toISOString() },
+      })
+      return reminder
+    })
+  }
+
+  async confirm(params: {
+    id: string
+    userId: string
+    remindAt: Date
+  }): Promise<ReminderRow | null> {
+    return this.db.transaction(async (tx) => {
+      const [reminder] = await tx
+        .update(reminders)
+        .set({
+          status: 'pending',
+          remindAt: params.remindAt,
+          updatedAt: new Date(),
+        })
+        .where(
+          and(
+            eq(reminders.id, params.id),
+            eq(reminders.userId, params.userId),
+            eq(reminders.status, 'candidate'),
+          ),
+        )
+        .returning()
+      if (!reminder) return null
+      await tx.insert(reminderEvents).values({
+        reminderId: reminder.id,
+        type: 'confirmed',
         metadata: { remindAt: params.remindAt.toISOString() },
       })
       return reminder

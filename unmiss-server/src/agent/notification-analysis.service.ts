@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config'
 import type { NotificationRow } from '../notifications/notifications.repository'
 import { AnalysisRepository } from './analysis.repository'
 import {
-  notificationAnalysisSchema,
-  type NotificationAnalysis,
+  notificationDigestSchema,
+  type NotificationDigest,
 } from './notification-analysis.schema'
 
 interface ChatCompletionResponse {
@@ -26,39 +26,79 @@ export class NotificationAnalysisService {
     ) && Boolean(this.apiKey())
   }
 
-  async analyzeById(id: string): Promise<void> {
-    if (!this.isConfigured()) return
-    const notification = await this.analysisRepository.claimById(id)
-    if (!notification) return
-    await this.analyzeClaimed(notification)
-  }
+  async processDueSchedules(now = new Date()): Promise<{
+    users: number
+    notifications: number
+  }> {
+    if (!this.isConfigured()) return { users: 0, notifications: 0 }
+    const schedules = await this.analysisRepository.analysisSchedules()
+    let processedUsers = 0
+    let processedNotifications = 0
 
-  private async analyzeClaimed(notification: NotificationRow): Promise<boolean> {
-    try {
-      const analysis = await this.requestAnalysis(notification)
-      await this.analysisRepository.save(notification, analysis)
-      return true
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'unknown error'
-      this.logger.warn(`notification analysis failed for ${notification.id}: ${message}`)
-      await this.analysisRepository.release(notification.id)
-      return false
+    for (const schedule of schedules) {
+      if (!isScheduleDue(schedule, now)) continue
+      const claimed = await this.analysisRepository.claimUserSchedule(
+        schedule.userId,
+        new Date(now.getTime() - 10 * 60_000),
+      )
+      if (!claimed) continue
+
+      const notifications = await this.analysisRepository.claimForUser(
+        schedule.userId,
+        new Date(now.getTime() - 30 * 60_000),
+        300,
+      )
+      try {
+        if (notifications.length > 0) {
+          const digest = await this.digestNotifications(
+            notifications,
+            schedule.timezone,
+            now,
+          )
+          await this.analysisRepository.saveDigest(
+            schedule.userId,
+            notifications.map((item) => item.id),
+            digest,
+          )
+          processedNotifications += notifications.length
+        }
+        await this.analysisRepository.completeUserSchedule(schedule.userId, now)
+        processedUsers += 1
+      } catch (error) {
+        const message = error instanceof Error ? error.message : 'unknown error'
+        this.logger.warn(`scheduled digest failed for ${schedule.userId}: ${message}`)
+        await this.analysisRepository.releaseMany(notifications.map((item) => item.id))
+        await this.analysisRepository.releaseUserSchedule(schedule.userId)
+      }
     }
+    return { users: processedUsers, notifications: processedNotifications }
   }
 
-  async processPending(limit = 20): Promise<number> {
-    if (!this.isConfigured()) return 0
-    const pending = await this.analysisRepository.claimUnprocessed(limit)
-    let processed = 0
-    for (const notification of pending) {
-      if (await this.analyzeClaimed(notification)) processed += 1
+  private async digestNotifications(
+    notifications: NotificationRow[],
+    timezone: string,
+    now: Date,
+  ): Promise<NotificationDigest> {
+    const digests: NotificationDigest[] = []
+    for (let offset = 0; offset < notifications.length; offset += 50) {
+      digests.push(
+        await this.requestDigest({
+          notifications: notifications.slice(offset, offset + 50).map(toPromptItem),
+          timezone,
+          currentTime: now.toISOString(),
+        }),
+      )
     }
-    return processed
+    if (digests.length === 1) return digests[0]!
+    return this.requestDigest({
+      candidateReminders: digests.flatMap((digest) => digest.reminders),
+      timezone,
+      currentTime: now.toISOString(),
+      instruction: 'Deduplicate and consolidate these candidates across the full segment.',
+    })
   }
 
-  private async requestAnalysis(
-    notification: NotificationRow,
-  ): Promise<NotificationAnalysis> {
+  private async requestDigest(input: Record<string, unknown>): Promise<NotificationDigest> {
     const baseUrl = this.config.getOrThrow<string>('AI_BASE_URL').replace(/\/$/, '')
     const response = await fetch(`${baseUrl}/chat/completions`, {
       method: 'POST',
@@ -74,15 +114,7 @@ export class NotificationAnalysisService {
           { role: 'system', content: SYSTEM_PROMPT },
           {
             role: 'user',
-            content: JSON.stringify({
-              packageName: notification.packageName,
-              title: notification.title,
-              text: notification.body,
-              subText: notification.subText,
-              postedAt: notification.postedAt.toISOString(),
-              timezone: notification.timezone,
-              currentTime: new Date().toISOString(),
-            }),
+            content: JSON.stringify(input),
           },
         ],
       }),
@@ -92,14 +124,7 @@ export class NotificationAnalysisService {
     const payload = (await response.json()) as ChatCompletionResponse
     const content = payload.choices?.[0]?.message?.content
     if (!content) throw new Error('AI returned no content')
-    const analysis = notificationAnalysisSchema.parse(JSON.parse(content))
-    if (
-      analysis.shouldCreateReminder &&
-      new Date(analysis.remindAt) <= notification.postedAt
-    ) {
-      throw new Error('AI returned a reminder time that is not in the future')
-    }
-    return analysis
+    return notificationDigestSchema.parse(JSON.parse(content))
   }
 
   private apiKey(): string {
@@ -111,17 +136,64 @@ export class NotificationAnalysisService {
   }
 }
 
-const SYSTEM_PROMPT = `You classify Android notifications into unfinished user obligations.
-Prefer precision over recall. Ignore ads, news, likes, recommendations, FYI messages,
-ordinary group chat, and system status. Create a reminder only when the user clearly
-needs to take a future action. Resolve relative dates in the supplied IANA timezone,
-using currentTime as the reference. Never invent a deadline. If an obligation has no
-explicit time, schedule it for 20:00 local time on the same day (or next day when that
-time has passed). All remindAt values must be absolute ISO 8601 timestamps with an
-offset and must be after postedAt.
+export function isScheduleDue(
+  schedule: { times: string[]; timezone: string; lastRunAt: Date | null },
+  now: Date,
+): boolean {
+  if (schedule.times.length === 0) return false
+  const nowKey = localMinuteKey(now, schedule.timezone)
+  const lastKey = schedule.lastRunAt
+    ? localMinuteKey(schedule.lastRunAt, schedule.timezone)
+    : ''
+  const date = nowKey.slice(0, 10)
+  const yesterday = localDateKey(new Date(now.getTime() - 24 * 60 * 60_000), schedule.timezone)
+  const candidates = [date, yesterday]
+    .flatMap((day) => schedule.times.map((time) => `${day}T${time}`))
+    .filter((candidate) => candidate <= nowKey)
+    .sort()
+  const latest = candidates.at(-1)
+  return Boolean(latest && latest > lastKey)
+}
 
-Return JSON only. If no reminder is needed:
-{"shouldCreateReminder":false,"reason":"..."}
+function localMinuteKey(date: Date, timezone: string): string {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  }).formatToParts(date)
+  const value = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? ''
+  return `${value('year')}-${value('month')}-${value('day')}T${value('hour')}:${value('minute')}`
+}
 
-If a reminder is needed:
-{"shouldCreateReminder":true,"title":"...","description":"...","reason":"...","importance":1,"remindAt":"..."}`
+function localDateKey(date: Date, timezone: string): string {
+  return localMinuteKey(date, timezone).slice(0, 10)
+}
+
+function toPromptItem(notification: NotificationRow) {
+  return {
+    id: notification.id,
+    packageName: notification.packageName,
+    title: notification.title?.slice(0, 512) ?? null,
+    text: notification.body?.slice(0, 1500) ?? null,
+    subText: notification.subText?.slice(0, 256) ?? null,
+    postedAt: notification.postedAt.toISOString(),
+  }
+}
+
+const SYSTEM_PROMPT = `You review a time segment of Android notifications to find
+secondary-important, secondary-urgent obligations the user may have overlooked while
+busy. Analyze the segment as a whole. Use later notifications to infer completion,
+supersession, or duplication. Prefer precision: exclude urgent alerts, OTPs, ads, news,
+likes, recommendations, FYI messages, ordinary chat, and anything with evidence that
+it was completed. Never invent an obligation or deadline.
+
+Return JSON only as {"reminders":[]}. Each reminder must contain sourceNotificationId,
+title, optional description, reason, importance (1-5), and an absolute ISO 8601
+remindAt in the supplied timezone. sourceNotificationId must be an input id. Merge
+duplicates into one reminder. remindAt must be after currentTime; when no explicit
+deadline exists, use 09:00 local time on the next day.`

@@ -1,9 +1,10 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, eq, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
-import { notifications, reminders } from '../database/schema'
+import { notifications, reminders, users } from '../database/schema'
 import type { NotificationRow } from '../notifications/notifications.repository'
 import type { NotificationAnalysis } from './notification-analysis.schema'
+import type { NotificationDigest } from './notification-analysis.schema'
 
 @Injectable()
 export class AnalysisRepository {
@@ -59,6 +60,88 @@ export class AnalysisRepository {
     return result.rows.map(normalizeNotificationRow)
   }
 
+  async analysisSchedules(): Promise<Array<{
+    userId: string
+    times: string[]
+    timezone: string
+    lastRunAt: Date | null
+    processingAt: Date | null
+  }>> {
+    return this.db
+      .select({
+        userId: users.id,
+        times: users.analysisTimes,
+        timezone: users.analysisTimezone,
+        lastRunAt: users.analysisLastRunAt,
+        processingAt: users.analysisProcessingAt,
+      })
+      .from(users)
+  }
+
+  async claimUserSchedule(userId: string, staleAt: Date): Promise<boolean> {
+    const rows = await this.db
+      .update(users)
+      .set({ analysisProcessingAt: new Date() })
+      .where(
+        and(
+          eq(users.id, userId),
+          or(
+            isNull(users.analysisProcessingAt),
+            lt(users.analysisProcessingAt, staleAt),
+          ),
+        ),
+      )
+      .returning({ id: users.id })
+    return rows.length === 1
+  }
+
+  async claimForUser(userId: string, cutoff: Date, limit: number): Promise<NotificationRow[]> {
+    const result = await this.db.execute(sql`
+      WITH claimed AS (
+        SELECT id
+        FROM notifications
+        WHERE user_id = ${userId}
+          AND agent_processed_at IS NULL
+          AND posted_at <= ${cutoff}
+          AND (agent_processing_at IS NULL OR agent_processing_at < now() - interval '5 minutes')
+        ORDER BY posted_at ASC
+        FOR UPDATE SKIP LOCKED
+        LIMIT ${limit}
+      )
+      UPDATE notifications AS notification
+      SET agent_processing_at = now()
+      FROM claimed
+      WHERE notification.id = claimed.id
+      RETURNING
+        notification.id,
+        notification.user_id AS "userId",
+        notification.device_id AS "deviceId",
+        notification.notification_key AS "notificationKey",
+        notification.package_name AS "packageName",
+        notification.title,
+        notification.body,
+        notification.sub_text AS "subText",
+        notification.timezone,
+        notification.posted_at AS "postedAt",
+        notification.received_at AS "receivedAt"
+    `)
+    return result.rows.map(normalizeNotificationRow)
+  }
+
+  async completeUserSchedule(userId: string, completedAt: Date): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ analysisLastRunAt: completedAt, analysisProcessingAt: null })
+      .where(eq(users.id, userId))
+  }
+
+  async releaseUserSchedule(userId: string): Promise<void> {
+    await this.db
+      .update(users)
+      .set({ analysisProcessingAt: null })
+      .where(eq(users.id, userId))
+  }
+
   async release(id: string): Promise<void> {
     await this.db
       .update(notifications)
@@ -90,6 +173,52 @@ export class AnalysisRepository {
         .set({ agentProcessedAt: new Date(), agentProcessingAt: null })
         .where(eq(notifications.id, notification.id))
     })
+  }
+
+  async saveDigest(
+    userId: string,
+    notificationIds: string[],
+    digest: NotificationDigest,
+  ): Promise<void> {
+    const allowedIds = new Set(notificationIds)
+    const reminderValues = digest.reminders
+      .filter((item) => allowedIds.has(item.sourceNotificationId))
+      .map((item) => ({
+        userId,
+        sourceNotificationId: item.sourceNotificationId,
+        title: item.title,
+        description: item.description ?? null,
+        reason: item.reason,
+        importance: item.importance,
+        status: 'candidate',
+        remindAt: new Date(item.remindAt),
+      }))
+
+    await this.db.transaction(async (tx) => {
+      if (reminderValues.length > 0) {
+        await tx
+          .insert(reminders)
+          .values(reminderValues)
+          .onConflictDoNothing({ target: reminders.sourceNotificationId })
+      }
+      await tx
+        .update(notifications)
+        .set({ agentProcessedAt: new Date(), agentProcessingAt: null })
+        .where(
+          and(
+            eq(notifications.userId, userId),
+            inArray(notifications.id, notificationIds),
+          ),
+        )
+    })
+  }
+
+  async releaseMany(notificationIds: string[]): Promise<void> {
+    if (notificationIds.length === 0) return
+    await this.db
+      .update(notifications)
+      .set({ agentProcessingAt: null })
+      .where(inArray(notifications.id, notificationIds))
   }
 
   private selection() {

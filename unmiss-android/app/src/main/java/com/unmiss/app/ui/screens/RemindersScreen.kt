@@ -61,7 +61,7 @@ fun RemindersScreen() {
         contentColor = MaterialTheme.colorScheme.onBackground,
         topBar = {
             TopAppBar(
-                title = { Text("提醒") },
+                title = { Text("遗漏事项") },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
             )
         },
@@ -74,7 +74,7 @@ fun RemindersScreen() {
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("待处理 ${reminders.size} 项", style = MaterialTheme.typography.titleMedium)
+                Text("可能遗漏 ${reminders.count { it.status == "candidate" }} 项", style = MaterialTheme.typography.titleMedium)
                 OutlinedButton(
                     enabled = !syncing,
                     onClick = {
@@ -97,7 +97,7 @@ fun RemindersScreen() {
                     verticalArrangement = Arrangement.Center,
                     horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
-                    Text("暂无提醒", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Text("目前没有可能遗漏的事项", color = MaterialTheme.colorScheme.onSurfaceVariant)
                 }
             } else {
                 LazyColumn(modifier = Modifier.fillMaxSize()) {
@@ -105,6 +105,12 @@ fun RemindersScreen() {
                         ReminderItem(
                             reminder = reminder,
                             onDone = { runAction { repository.done(reminder.id) } },
+                            onConfirm = {
+                                runAction {
+                                    repository.confirm(reminder.id, Instant.now().plusSeconds(3600))
+                                    ReminderDisplayWorker.schedule(context, reminder.id, 3_600_000)
+                                }
+                            },
                             onSnooze = {
                                 runAction {
                                     repository.snooze(reminder.id, Instant.now().plusSeconds(3600))
@@ -125,6 +131,7 @@ fun RemindersScreen() {
 private fun ReminderItem(
     reminder: LocalReminder,
     onDone: () -> Unit,
+    onConfirm: () -> Unit,
     onSnooze: () -> Unit,
     onIgnore: () -> Unit,
 ) {
@@ -134,14 +141,26 @@ private fun ReminderItem(
     ) {
         Text(reminder.title, style = MaterialTheme.typography.titleMedium)
         reminder.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        if (reminder.status == "candidate") {
+            Text(
+                "归纳发现 · 等待你确认",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
         Text(
             formatTime(reminder.remindAt),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onDone) { Text("已完成") }
-            OutlinedButton(onClick = onSnooze) { Text("一小时后") }
+            if (reminder.status == "candidate") {
+                Button(onClick = onConfirm) { Text("提醒我") }
+                OutlinedButton(onClick = onDone) { Text("已处理") }
+            } else {
+                Button(onClick = onDone) { Text("已完成") }
+                OutlinedButton(onClick = onSnooze) { Text("一小时后") }
+            }
             TextButton(onClick = onIgnore) { Text("忽略") }
         }
     }

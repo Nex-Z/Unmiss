@@ -12,6 +12,15 @@ import {
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
+  analysisTimes: jsonb('analysis_times')
+    .$type<string[]>()
+    .notNull()
+    .default(sql`'["22:00"]'::jsonb`),
+  analysisTimezone: text('analysis_timezone').notNull().default('UTC'),
+  analysisLastRunAt: timestamp('analysis_last_run_at', { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+  analysisProcessingAt: timestamp('analysis_processing_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),

@@ -18,6 +18,10 @@ export class RemindersService {
     return this.remindersRepository.pendingForUser(device.userId)
   }
 
+  inbox(device: DevicePayload): Promise<ReminderRow[]> {
+    return this.remindersRepository.inboxForUser(device.userId)
+  }
+
   async done(device: DevicePayload, id: string): Promise<ReminderRow> {
     const reminder = await this.remindersRepository.setStatus({
       id,
@@ -57,6 +61,26 @@ export class RemindersService {
       throw new ConflictException('only pending reminders can be snoozed')
     }
     return reminder
+  }
+
+  async confirm(
+    device: DevicePayload,
+    id: string,
+    remindAt: Date,
+  ): Promise<ReminderRow> {
+    if (remindAt <= new Date()) {
+      throw new BadRequestException('remindAt must be in the future')
+    }
+    const reminder = await this.remindersRepository.confirm({
+      id,
+      userId: device.userId,
+      remindAt,
+    })
+    if (reminder) return reminder
+    const existing = await this.remindersRepository.findForUser(id, device.userId)
+    if (!existing) throw new NotFoundException('reminder not found')
+    if (existing.status === 'pending') return existing
+    throw new ConflictException('only candidate reminders can be confirmed')
   }
 
   private async existingTerminal(

@@ -101,7 +101,7 @@ interface PendingNotificationUploadDao {
 
 @Dao
 interface ReminderDao {
-    @Query("SELECT * FROM reminders WHERE status = 'pending' ORDER BY remind_at ASC")
+    @Query("SELECT * FROM reminders WHERE status IN ('candidate', 'pending') ORDER BY remind_at ASC")
     fun observePending(): kotlinx.coroutines.flow.Flow<List<LocalReminder>>
 
     @Query("SELECT * FROM reminders WHERE id = :id LIMIT 1")
@@ -110,10 +110,10 @@ interface ReminderDao {
     @androidx.room.Upsert
     suspend fun upsertAll(reminders: List<LocalReminder>)
 
-    @Query("DELETE FROM reminders WHERE status = 'pending' AND id NOT IN (:remoteIds)")
+    @Query("DELETE FROM reminders WHERE status IN ('candidate', 'pending') AND id NOT IN (:remoteIds)")
     suspend fun deletePendingMissing(remoteIds: List<String>)
 
-    @Query("DELETE FROM reminders WHERE status = 'pending'")
+    @Query("DELETE FROM reminders WHERE status IN ('candidate', 'pending')")
     suspend fun deleteAllPending()
 
     @Query("UPDATE reminders SET status = :status WHERE id = :id")

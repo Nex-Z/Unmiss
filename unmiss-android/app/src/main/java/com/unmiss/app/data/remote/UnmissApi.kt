@@ -25,8 +25,19 @@ interface UnmissApi {
         @retrofit2.http.Body body: NotificationUploadBatchRequest,
     ): retrofit2.Response<NotificationUploadBatchResponse>
 
+    @retrofit2.http.GET("devices/me/analysis-schedule")
+    suspend fun analysisSchedule(): AnalysisScheduleDto
+
+    @retrofit2.http.PUT("devices/me/analysis-schedule")
+    suspend fun updateAnalysisSchedule(
+        @retrofit2.http.Body body: UpdateAnalysisScheduleRequest,
+    ): AnalysisScheduleDto
+
     @retrofit2.http.GET("reminders/pending")
     suspend fun pendingReminders(): List<ReminderDto>
+
+    @retrofit2.http.GET("reminders/inbox")
+    suspend fun reminderInbox(): List<ReminderDto>
 
     @retrofit2.http.POST("reminders/{id}/done")
     suspend fun completeReminder(
@@ -40,6 +51,12 @@ interface UnmissApi {
 
     @retrofit2.http.POST("reminders/{id}/snooze")
     suspend fun snoozeReminder(
+        @retrofit2.http.Path("id") id: String,
+        @retrofit2.http.Body body: SnoozeReminderRequest,
+    ): ReminderDto
+
+    @retrofit2.http.POST("reminders/{id}/confirm")
+    suspend fun confirmReminder(
         @retrofit2.http.Path("id") id: String,
         @retrofit2.http.Body body: SnoozeReminderRequest,
     ): ReminderDto

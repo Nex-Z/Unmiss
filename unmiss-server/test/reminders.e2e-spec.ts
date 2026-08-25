@@ -104,4 +104,38 @@ describe('Reminders (e2e)', () => {
       .expect(200)
     expect(empty.body).toEqual([])
   })
+
+  it('keeps digest candidates silent until the user confirms them', async () => {
+    const [candidate] = await db
+      .insert(reminders)
+      .values({
+        userId,
+        title: 'Possible missed item',
+        status: 'candidate',
+        remindAt: new Date(Date.now() + 60_000),
+      })
+      .returning({ id: reminders.id })
+    reminderIds.push(candidate!.id)
+    const auth = { Authorization: `Bearer ${token}` }
+
+    const pending = await request(app.getHttpServer())
+      .get('/api/v1/reminders/pending')
+      .set(auth)
+      .expect(200)
+    expect(pending.body).toEqual([])
+
+    const inbox = await request(app.getHttpServer())
+      .get('/api/v1/reminders/inbox')
+      .set(auth)
+      .expect(200)
+    expect(inbox.body).toHaveLength(1)
+    expect(inbox.body[0].status).toBe('candidate')
+
+    const confirmed = await request(app.getHttpServer())
+      .post(`/api/v1/reminders/${candidate!.id}/confirm`)
+      .set(auth)
+      .send({ remindAt: new Date(Date.now() + 3_600_000).toISOString() })
+      .expect(201)
+    expect(confirmed.body.status).toBe('pending')
+  })
 })

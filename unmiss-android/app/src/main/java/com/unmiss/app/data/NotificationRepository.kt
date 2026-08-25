@@ -5,6 +5,8 @@ import com.unmiss.app.data.db.PendingNotificationUpload
 import com.unmiss.app.data.remote.DeviceRegisterRequest
 import com.unmiss.app.data.remote.NotificationUploadRequest
 import com.unmiss.app.data.remote.NotificationUploadBatchRequest
+import com.unmiss.app.data.remote.AnalysisScheduleDto
+import com.unmiss.app.data.remote.UpdateAnalysisScheduleRequest
 import com.unmiss.app.upload.PayloadCodec
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -89,5 +91,40 @@ class NotificationRepository(private val container: AppContainer) {
             }
         }
         throw IllegalStateException("batch upload failed after re-registration")
+    }
+
+    suspend fun analysisSchedule(): AnalysisScheduleDto = authenticatedCall { api ->
+        api.analysisSchedule()
+    }
+
+    suspend fun updateAnalysisSchedule(times: Set<String>): AnalysisScheduleDto {
+        val normalized = times.sorted()
+        val timezone = ZoneId.systemDefault().id
+        val updated = authenticatedCall { api ->
+            api.updateAnalysisSchedule(
+                UpdateAnalysisScheduleRequest(times = normalized, timezone = timezone),
+            )
+        }
+        container.settingsDataStore.setAnalysisTimes(updated.times.toSet())
+        return updated
+    }
+
+    private suspend fun <T> authenticatedCall(
+        block: suspend (com.unmiss.app.data.remote.UnmissApi) -> T,
+    ): T {
+        repeat(2) { attempt ->
+            ensureRegistered()
+            val api = container.apiFactory.create(container.settingsDataStore.baseUrlOnce())
+            try {
+                return block(api)
+            } catch (error: retrofit2.HttpException) {
+                if (error.code() == 401 && attempt == 0) {
+                    container.tokenStore.clear()
+                } else {
+                    throw error
+                }
+            }
+        }
+        error("request failed after re-registration")
     }
 }

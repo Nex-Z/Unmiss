@@ -1,5 +1,7 @@
 package com.unmiss.app.ui.screens
 
+import android.app.TimePickerDialog
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -12,10 +14,14 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -35,26 +41,73 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.reminder.ReminderSyncWorker
 import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
     val settings = ServiceLocator.get().settingsDataStore
     var baseUrl by remember { mutableStateOf("") }
     var saved by remember { mutableStateOf(false) }
     var captureEnabled by remember { mutableStateOf(true) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleteMessage by remember { mutableStateOf<String?>(null) }
+    var analysisTimes by remember { mutableStateOf(listOf("22:00")) }
+    var scheduleMessage by remember { mutableStateOf<String?>(null) }
+    var scheduleSaving by remember { mutableStateOf(false) }
+
+    fun saveAnalysisTimes(updated: List<String>) {
+        val normalized = updated.distinct().sorted()
+        if (normalized.isEmpty()) return
+        analysisTimes = normalized
+        scheduleSaving = true
+        scheduleMessage = null
+        scope.launch {
+            settings.setAnalysisTimes(normalized.toSet())
+            runCatching {
+                ServiceLocator.get().notificationRepository
+                    .updateAnalysisSchedule(normalized.toSet())
+            }.onSuccess {
+                scheduleMessage = "已同步，下一次将在 ${nextAnalysisTime(normalized)} 归纳"
+            }.onFailure {
+                scheduleMessage = "保存在本机，但同步失败；请检查网络"
+            }
+            scheduleSaving = false
+        }
+    }
+
+    fun showTimePicker() {
+        val initial = LocalTime.now().plusHours(1)
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                val value = "%02d:%02d".format(hour, minute)
+                saveAnalysisTimes(analysisTimes + value)
+            },
+            initial.hour,
+            initial.minute,
+            true,
+        ).show()
+    }
 
     LaunchedEffect(Unit) {
         baseUrl = settings.baseUrlOnce()
         captureEnabled = settings.captureEnabledOnce()
+        analysisTimes = settings.analysisTimesOnce().sorted()
+        runCatching { ServiceLocator.get().notificationRepository.analysisSchedule() }
+            .onSuccess { remote ->
+                analysisTimes = remote.times.sorted()
+                settings.setAnalysisTimes(remote.times.toSet())
+            }
     }
 
     Scaffold(
@@ -101,6 +154,74 @@ fun SettingsScreen(onBack: () -> Unit) {
                             scope.launch { settings.setCaptureEnabled(enabled) }
                         },
                     )
+                }
+            }
+
+            Surface(
+                modifier = Modifier.fillMaxWidth().animateContentSize(),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White.copy(alpha = 0.86f),
+            ) {
+                Column(modifier = Modifier.padding(vertical = 18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "每日归纳",
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.SemiBold,
+                            )
+                            Text(
+                                "只在这些时间梳理可能遗漏的非紧急事项",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        IconButton(enabled = !scheduleSaving, onClick = ::showTimePicker) {
+                            Icon(Icons.Default.Add, contentDescription = "添加归纳时间")
+                        }
+                    }
+                    analysisTimes.forEachIndexed { index, time ->
+                        if (index == 0) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(top = 14.dp),
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
+                            )
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Icon(
+                                Icons.Default.Schedule,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary,
+                            )
+                            Text(
+                                time,
+                                modifier = Modifier.weight(1f).padding(start = 14.dp),
+                                style = MaterialTheme.typography.headlineSmall,
+                                fontWeight = FontWeight.Medium,
+                            )
+                            IconButton(
+                                enabled = analysisTimes.size > 1 && !scheduleSaving,
+                                onClick = { saveAnalysisTimes(analysisTimes - time) },
+                            ) {
+                                Icon(Icons.Default.DeleteOutline, contentDescription = "删除 $time")
+                            }
+                        }
+                    }
+                    scheduleMessage?.let {
+                        Text(
+                            it,
+                            modifier = Modifier.padding(horizontal = 18.dp, vertical = 4.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -173,4 +294,14 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
         }
     }
+}
+
+private fun nextAnalysisTime(times: List<String>): String {
+    val formatter = DateTimeFormatter.ofPattern("HH:mm")
+    val now = LocalTime.now()
+    val parsed = times.mapNotNull { value ->
+        runCatching { LocalTime.parse(value, formatter) }.getOrNull()
+    }.sorted()
+    val today = parsed.firstOrNull { it.isAfter(now) }
+    return if (today != null) today.format(formatter) else "明天 ${parsed.first().format(formatter)}"
 }

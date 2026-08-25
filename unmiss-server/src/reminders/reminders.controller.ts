@@ -16,6 +16,11 @@ export class RemindersController {
     return this.remindersService.pending(device)
   }
 
+  @Get('inbox')
+  inbox(@CurrentDevice() device: DevicePayload): Promise<ReminderRow[]> {
+    return this.remindersService.inbox(device)
+  }
+
   @Post(':id/done')
   done(
     @CurrentDevice() device: DevicePayload,
@@ -39,5 +44,14 @@ export class RemindersController {
     @Body() dto: SnoozeReminderDto,
   ): Promise<ReminderRow> {
     return this.remindersService.snooze(device, id, new Date(dto.remindAt))
+  }
+
+  @Post(':id/confirm')
+  confirm(
+    @CurrentDevice() device: DevicePayload,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: SnoozeReminderDto,
+  ): Promise<ReminderRow> {
+    return this.remindersService.confirm(device, id, new Date(dto.remindAt))
   }
 }

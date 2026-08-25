@@ -49,6 +49,19 @@ data class NotificationUploadBatchResponse(
 data class DeleteDataResponse(val deleted: Boolean)
 
 @Serializable
+data class AnalysisScheduleDto(
+    val times: List<String>,
+    val timezone: String,
+    @SerialName("lastRunAt") val lastRunAt: String? = null,
+)
+
+@Serializable
+data class UpdateAnalysisScheduleRequest(
+    val times: List<String>,
+    val timezone: String,
+)
+
+@Serializable
 data class ReminderDto(
     val id: String,
     val title: String,

@@ -1,7 +1,8 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common'
+import { BadRequestException, Injectable, UnauthorizedException } from '@nestjs/common'
 import { JwtService } from '@nestjs/jwt'
 import { DevicesRepository, type DeviceRow } from './devices.repository'
 import type { RegisterDeviceDto } from './dto/register-device.dto'
+import type { UpdateAnalysisScheduleDto } from './dto/update-analysis-schedule.dto'
 
 export interface RegisterDeviceResult {
   token: string
@@ -45,6 +46,23 @@ export class DevicesService {
   async updatePushToken(deviceId: string, pushToken: string): Promise<void> {
     await this.verifyDevice(deviceId)
     await this.devicesRepository.updatePushToken(deviceId, pushToken)
+  }
+
+  analysisSchedule(userId: string) {
+    return this.devicesRepository.analysisSchedule(userId)
+  }
+
+  updateAnalysisSchedule(userId: string, dto: UpdateAnalysisScheduleDto) {
+    try {
+      new Intl.DateTimeFormat('en-US', { timeZone: dto.timezone }).format()
+    } catch {
+      throw new BadRequestException('invalid timezone')
+    }
+    return this.devicesRepository.updateAnalysisSchedule(
+      userId,
+      dto.times,
+      dto.timezone,
+    )
   }
 
   async deleteUserData(userId: string): Promise<void> {
