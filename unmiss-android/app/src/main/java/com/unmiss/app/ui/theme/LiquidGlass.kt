@@ -128,6 +128,7 @@ fun LiquidGlass(
     val shape = glassShape ?: RoundedCornerShape(cornerRadius.dp)
     val backdrop = LocalLiquidBackdrop.current
     val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
+    val navigationResponse = if (intensity == 0f) 0f else 0.35f + intensity * 0.65f
     val enhanced = LocalLiquidGlassEnabled.current && intensity > 0f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -158,11 +159,11 @@ fun LiquidGlass(
                 effects = {
                     if (intensity > 0f) {
                         if (!navigation) vibrancy()
-                        blur((if (navigation) 7.dp else if (panel) 10.dp else 8.dp).toPx() * intensity)
+                        blur((if (navigation) 15.dp.toPx() * navigationResponse else (if (panel) 10.dp else 8.dp).toPx() * intensity))
                         lens(
-                            refractionHeight = (if (navigation) 13.dp else if (panel) 7.dp else 18.dp).toPx() * intensity,
-                            refractionAmount = (if (navigation) 20.dp else if (panel) 10.dp else 24.dp).toPx() * intensity,
-                            chromaticAberration = !panel && intensity >= 0.35f,
+                            refractionHeight = (if (navigation) 4.dp else if (panel) 7.dp else 18.dp).toPx() * intensity,
+                            refractionAmount = (if (navigation) 6.dp else if (panel) 10.dp else 24.dp).toPx() * intensity,
+                            chromaticAberration = !navigation && !panel && intensity >= 0.35f,
                         )
                     }
                 },
@@ -238,17 +239,18 @@ fun Modifier.liquidNavigationIndicator(
 ): Modifier {
     val backdrop = LocalLiquidBackdrop.current
     val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
+    val navigationResponse = if (intensity == 0f) 0f else 0.35f + intensity * 0.65f
     val shape = RoundedCornerShape(28.dp)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             if (intensity > 0f) {
-                blur((if (dragging) 3.dp else 5.dp).toPx() * intensity)
+                blur((if (dragging) 8.dp else 10.dp).toPx() * navigationResponse)
                 lens(
-                    refractionHeight = (if (dragging) 18.dp else 12.dp).toPx() * intensity,
-                    refractionAmount = (if (dragging) 28.dp else 18.dp).toPx() * intensity,
-                    chromaticAberration = intensity >= 0.35f,
+                    refractionHeight = (if (dragging) 7.dp else 4.dp).toPx() * intensity,
+                    refractionAmount = (if (dragging) 10.dp else 6.dp).toPx() * intensity,
+                    chromaticAberration = dragging && intensity >= 0.6f,
                 )
             }
         },
