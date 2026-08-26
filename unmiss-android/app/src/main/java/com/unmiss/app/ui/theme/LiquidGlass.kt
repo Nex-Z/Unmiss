@@ -117,6 +117,8 @@ fun LiquidGlass(
     cornerRadius: Int = 28,
     glassShape: Shape? = null,
     panel: Boolean = false,
+    navigation: Boolean = false,
+    surfaceAlpha: Float = 0.52f,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -151,10 +153,10 @@ fun LiquidGlass(
                 shape = { shape },
                 effects = {
                     vibrancy()
-                    blur((if (panel) 10.dp else 8.dp).toPx())
+                    blur((if (navigation) 4.dp else if (panel) 10.dp else 8.dp).toPx())
                     lens(
-                        refractionHeight = (if (panel) 7.dp else 18.dp).toPx(),
-                        refractionAmount = (if (panel) 10.dp else 24.dp).toPx(),
+                        refractionHeight = (if (navigation) 13.dp else if (panel) 7.dp else 18.dp).toPx(),
+                        refractionAmount = (if (navigation) 20.dp else if (panel) 10.dp else 24.dp).toPx(),
                         chromaticAberration = !panel,
                     )
                 },
@@ -170,7 +172,7 @@ fun LiquidGlass(
                     { InnerShadow(radius = 7.dp, alpha = 0.3f) }
                 } else null,
                 onDrawSurface = {
-                    drawRect(Color.White.copy(alpha = 0.52f))
+                    drawRect(Color.White.copy(alpha = surfaceAlpha.coerceIn(0f, 1f)))
                 },
             )
             .border(

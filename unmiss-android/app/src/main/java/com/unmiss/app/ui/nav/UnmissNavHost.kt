@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.History
@@ -25,8 +26,10 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -44,6 +47,8 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.kyant.backdrop.backdrops.layerBackdrop
+import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -58,6 +63,7 @@ import com.unmiss.app.ui.screens.SettingsScreen
 import com.unmiss.app.ui.theme.LiquidGlass
 import com.unmiss.app.ui.theme.LiquidGlassCanvas
 import com.unmiss.app.ui.theme.LocalLiquidGlassEnabled
+import com.unmiss.app.ui.theme.LocalLiquidBackdrop
 import com.unmiss.app.ui.theme.liquidNavigationIndicator
 import com.unmiss.app.upload.UploadWorker
 import kotlinx.coroutines.launch
@@ -78,6 +84,7 @@ fun UnmissNavHost() {
     val liquidGlassEnabled by ServiceLocator.get().settingsDataStore.liquidGlassEnabled
         .collectAsState(initial = true)
     val navController = rememberNavController()
+    val navigationBackdrop = rememberLayerBackdrop()
     val items = listOf(
         BottomNavItem(Routes.HOME, "首页", Icons.Filled.Home),
         BottomNavItem(Routes.REMINDERS, "提醒", Icons.Filled.Notifications),
@@ -105,7 +112,7 @@ fun UnmissNavHost() {
             NavHost(
                 navController = navController,
                 startDestination = Routes.HOME,
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier.fillMaxSize().layerBackdrop(navigationBackdrop),
             ) {
                 composable(Routes.HOME) {
                     HomeScreen(
@@ -122,11 +129,13 @@ fun UnmissNavHost() {
             }
             if (currentRoute != Routes.SETTINGS) {
                 Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                    LiquidBottomBar(
-                        items = items,
-                        currentRoute = currentRoute,
-                        onSelect = ::navigateTopLevel,
-                    )
+                    CompositionLocalProvider(LocalLiquidBackdrop provides navigationBackdrop) {
+                        LiquidBottomBar(
+                            items = items,
+                            currentRoute = currentRoute,
+                            onSelect = ::navigateTopLevel,
+                        )
+                    }
                 }
             }
         }
@@ -153,7 +162,12 @@ private fun ClassicBottomBar(
     onSelect: (String) -> Unit,
 ) {
     Box(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 18.dp, vertical = 10.dp)) {
-        LiquidGlass(modifier = Modifier.fillMaxWidth(), cornerRadius = 32) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(32.dp),
+            color = Color.White.copy(alpha = 0.38f),
+            shadowElevation = 5.dp,
+        ) {
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 items.forEach { item ->
                     val selected = currentRoute == item.route
@@ -217,7 +231,12 @@ private fun DraggableLiquidBottomBar(
             .navigationBarsPadding()
             .padding(horizontal = 14.dp, vertical = 8.dp),
     ) {
-        LiquidGlass(modifier = Modifier.fillMaxWidth(), cornerRadius = 34) {
+        LiquidGlass(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 34,
+            navigation = true,
+            surfaceAlpha = 0.08f,
+        ) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(64.dp)) {
                 val tabWidthPx = constraints.maxWidth.toFloat() / items.size
                 val tabWidth = with(LocalDensity.current) { tabWidthPx.toDp() }
