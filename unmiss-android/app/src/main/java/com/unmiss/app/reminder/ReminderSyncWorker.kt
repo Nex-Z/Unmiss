@@ -21,7 +21,10 @@ class ReminderSyncWorker(context: Context, params: WorkerParameters) :
     override suspend fun doWork(): Result = try {
         val previousIds = ServiceLocator.get().reminderDao.activeOnce().map { it.id }.toSet()
         val reminders = ServiceLocator.get().reminderRepository.sync()
-        val activeIds = reminders.map { it.id }.toSet()
+        val activeIds = reminders
+            .filter { it.status == "candidate" || it.status == "pending" }
+            .map { it.id }
+            .toSet()
         (previousIds - activeIds).forEach { id ->
             ReminderDisplayWorker.cancel(applicationContext, id)
         }

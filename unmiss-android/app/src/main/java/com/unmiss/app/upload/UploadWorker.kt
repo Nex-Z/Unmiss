@@ -8,6 +8,8 @@ import androidx.work.ExistingWorkPolicy
 import androidx.work.NetworkType
 import androidx.work.OneTimeWorkRequest
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.PeriodicWorkRequestBuilder
+import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import com.unmiss.app.data.ServiceLocator
@@ -78,12 +80,25 @@ class UploadWorker(
         const val UNIQUE_WORK_NAME = "unmiss-notification-upload"
         private const val BATCH_SIZE = 100
         private const val MAX_BATCHES_PER_RUN = 5
+        private const val PERIODIC_WORK_NAME = "unmiss-notification-upload-safety"
+
+        fun schedule(context: Context) {
+            val periodic = PeriodicWorkRequestBuilder<UploadWorker>(15, TimeUnit.MINUTES)
+                .setConstraints(networkConstraints())
+                .build()
+            WorkManager.getInstance(context).enqueueUniquePeriodicWork(
+                PERIODIC_WORK_NAME,
+                ExistingPeriodicWorkPolicy.KEEP,
+                periodic,
+            )
+            enqueue(context)
+        }
 
         fun enqueue(context: Context) {
             WorkManager.getInstance(context).enqueueUniqueWork(
                 UNIQUE_WORK_NAME,
                 ExistingWorkPolicy.KEEP,
-                request(initialDelaySeconds = 5),
+                request(initialDelaySeconds = 0),
             )
         }
 
@@ -106,12 +121,14 @@ class UploadWorker(
         private fun request(initialDelaySeconds: Long): OneTimeWorkRequest =
             OneTimeWorkRequestBuilder<UploadWorker>()
                 .setConstraints(
-                    Constraints.Builder()
-                        .setRequiredNetworkType(NetworkType.CONNECTED)
-                        .build(),
+                    networkConstraints(),
                 )
                 .setInitialDelay(initialDelaySeconds, TimeUnit.SECONDS)
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
+                .setBackoffCriteria(BackoffPolicy.LINEAR, 10, TimeUnit.SECONDS)
                 .build()
+
+        private fun networkConstraints() = Constraints.Builder()
+            .setRequiredNetworkType(NetworkType.CONNECTED)
+            .build()
     }
 }

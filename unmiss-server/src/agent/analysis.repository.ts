@@ -1,7 +1,7 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, isNull, lt, or, sql } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
-import { notifications, reminderEvents, reminders, users } from '../database/schema'
+import { analysisRuns, notifications, reminderEvents, reminders, users } from '../database/schema'
 import type { NotificationRow } from '../notifications/notifications.repository'
 import type { NotificationAnalysis } from './notification-analysis.schema'
 import type { NotificationDigest } from './notification-analysis.schema'
@@ -9,6 +9,44 @@ import type { NotificationDigest } from './notification-analysis.schema'
 @Injectable()
 export class AnalysisRepository {
   constructor(@Inject(DRIZZLE) private readonly db: DrizzleDB) {}
+
+  async createRun(userId: string, notificationCount: number): Promise<string> {
+    const [run] = await this.db
+      .insert(analysisRuns)
+      .values({ userId, notificationCount })
+      .returning({ id: analysisRuns.id })
+    if (!run) throw new Error('failed to create analysis run')
+    return run.id
+  }
+
+  async completeRun(runId: string, digest: NotificationDigest): Promise<void> {
+    await this.db
+      .update(analysisRuns)
+      .set({
+        status: 'success',
+        reminderCount: digest.reminders.length,
+        updateCount: digest.updates.length,
+        result: digest,
+        completedAt: new Date(),
+      })
+      .where(eq(analysisRuns.id, runId))
+  }
+
+  async failRun(runId: string, error: string): Promise<void> {
+    await this.db
+      .update(analysisRuns)
+      .set({ status: 'failed', error: error.slice(0, 2000), completedAt: new Date() })
+      .where(eq(analysisRuns.id, runId))
+  }
+
+  recentRuns(userId: string, limit = 50) {
+    return this.db
+      .select()
+      .from(analysisRuns)
+      .where(eq(analysisRuns.userId, userId))
+      .orderBy(desc(analysisRuns.startedAt))
+      .limit(limit)
+  }
 
   async claimById(id: string): Promise<NotificationRow | null> {
     const staleAt = new Date(Date.now() - 5 * 60_000)

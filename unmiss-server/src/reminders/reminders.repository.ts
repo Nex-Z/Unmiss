@@ -1,5 +1,5 @@
 import { Inject, Injectable } from '@nestjs/common'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, desc, eq, inArray } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
 import { reminderEvents, reminders } from '../database/schema'
 
@@ -28,6 +28,15 @@ export class RemindersRepository {
         ),
       )
       .orderBy(asc(reminders.remindAt))
+  }
+
+  async historyForUser(userId: string): Promise<ReminderRow[]> {
+    return this.db
+      .select()
+      .from(reminders)
+      .where(eq(reminders.userId, userId))
+      .orderBy(desc(reminders.updatedAt))
+      .limit(500)
   }
 
   async findForUser(id: string, userId: string): Promise<ReminderRow | null> {

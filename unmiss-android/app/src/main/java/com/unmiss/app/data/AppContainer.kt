@@ -25,6 +25,7 @@ class AppContainer(context: Context) {
         Room.databaseBuilder(context, UnmissDatabase::class.java, "unmiss.db")
             .addMigrations(UnmissDatabase.MIGRATION_2_3)
             .addMigrations(UnmissDatabase.MIGRATION_3_4)
+            .addMigrations(UnmissDatabase.MIGRATION_4_5)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

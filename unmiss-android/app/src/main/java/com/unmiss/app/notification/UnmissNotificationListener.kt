@@ -16,6 +16,11 @@ class UnmissNotificationListener : NotificationListenerService() {
 
     private val container by lazy { ServiceLocator.get() }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        UploadWorker.enqueueNow(this)
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         val packageName = sbn.packageName ?: return
         if (packageName == this.packageName) return

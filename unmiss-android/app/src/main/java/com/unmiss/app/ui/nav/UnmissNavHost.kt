@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,6 @@ import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -86,48 +86,48 @@ fun UnmissNavHost() {
     )
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
 
+    fun navigateTopLevel(route: String) {
+        if (currentRoute == route) return
+        navController.navigate(route) {
+            popUpTo(navController.graph.findStartDestination().id) { saveState = true }
+            launchSingleTop = true
+            restoreState = true
+        }
+    }
+
     LaunchedEffect(Unit) {
         runCatching { ServiceLocator.get().notificationRepository.ensureRegistered() }
         UploadWorker.enqueueNow(navController.context)
     }
 
     LiquidGlassCanvas(enabled = liquidGlassEnabled) {
-        Scaffold(
-            containerColor = Color.Transparent,
-            contentColor = MaterialTheme.colorScheme.onBackground,
-            bottomBar = {
-                if (currentRoute != Routes.SETTINGS) {
-                    LiquidBottomBar(
-                        items = items,
-                        currentRoute = currentRoute,
-                        onSelect = { route ->
-                            navController.navigate(route) {
-                                popUpTo(navController.graph.findStartDestination().id) { saveState = true }
-                                launchSingleTop = true
-                                restoreState = true
-                            }
-                        },
-                    )
-                }
-            },
-        ) { padding ->
+        Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,
                 startDestination = Routes.HOME,
-                modifier = Modifier.padding(padding),
+                modifier = Modifier.fillMaxSize(),
             ) {
                 composable(Routes.HOME) {
                     HomeScreen(
                         onOpenSettings = { navController.navigate(Routes.SETTINGS) },
-                        onOpenAllowlist = { navController.navigate(Routes.ALLOWLIST) },
-                        onOpenReminders = { navController.navigate(Routes.REMINDERS) },
-                        onOpenHistory = { navController.navigate(Routes.HISTORY) },
+                        onOpenAllowlist = { navigateTopLevel(Routes.ALLOWLIST) },
+                        onOpenReminders = { navigateTopLevel(Routes.REMINDERS) },
+                        onOpenHistory = { navigateTopLevel(Routes.HISTORY) },
                     )
                 }
                 composable(Routes.ALLOWLIST) { AllowlistScreen() }
                 composable(Routes.HISTORY) { NotificationHistoryScreen() }
                 composable(Routes.REMINDERS) { RemindersScreen() }
                 composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
+            }
+            if (currentRoute != Routes.SETTINGS) {
+                Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                    LiquidBottomBar(
+                        items = items,
+                        currentRoute = currentRoute,
+                        onSelect = ::navigateTopLevel,
+                    )
+                }
             }
         }
     }

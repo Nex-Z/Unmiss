@@ -22,6 +22,10 @@ export class RemindersService {
     return this.remindersRepository.inboxForUser(device.userId)
   }
 
+  history(device: DevicePayload): Promise<ReminderRow[]> {
+    return this.remindersRepository.historyForUser(device.userId)
+  }
+
   async done(device: DevicePayload, id: string): Promise<ReminderRow> {
     const reminder = await this.remindersRepository.setStatus({
       id,

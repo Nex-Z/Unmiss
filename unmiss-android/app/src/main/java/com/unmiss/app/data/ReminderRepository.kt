@@ -10,18 +10,16 @@ import java.time.Instant
 class ReminderRepository(private val container: AppContainer) {
 
     val pending = container.reminderDao.observePending()
+    val all = container.reminderDao.observeAll()
 
     suspend fun sync(): List<LocalReminder> = authenticatedCall { api ->
-        val remote = api.reminderInbox()
+        val remote = api.reminderHistory()
         val local = remote.map { dto -> dto.toLocal(container.reminderDao.find(dto.id)?.displayedAt) }
-        if (local.isEmpty()) {
-            container.reminderDao.deleteAllPending()
-        } else {
-            container.reminderDao.upsertAll(local)
-            container.reminderDao.deletePendingMissing(local.map { it.id })
-        }
+        container.reminderDao.upsertAll(local)
         local
     }
+
+    suspend fun analysisRuns() = authenticatedCall { api -> api.analysisRuns() }
 
     suspend fun done(id: String) = authenticatedCall { api ->
         api.completeReminder(id)
@@ -78,4 +76,7 @@ private fun ReminderDto.toLocal(displayedAt: Long?): LocalReminder = LocalRemind
     status = status,
     remindAt = remindAt,
     displayedAt = displayedAt,
+    createdAt = createdAt,
+    updatedAt = updatedAt,
+    completedAt = completedAt,
 )

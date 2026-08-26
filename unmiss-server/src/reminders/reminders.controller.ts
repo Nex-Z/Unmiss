@@ -21,6 +21,11 @@ export class RemindersController {
     return this.remindersService.inbox(device)
   }
 
+  @Get('history')
+  history(@CurrentDevice() device: DevicePayload): Promise<ReminderRow[]> {
+    return this.remindersService.history(device)
+  }
+
   @Post(':id/done')
   done(
     @CurrentDevice() device: DevicePayload,

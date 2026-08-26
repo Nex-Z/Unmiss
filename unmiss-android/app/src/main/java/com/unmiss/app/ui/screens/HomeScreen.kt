@@ -102,7 +102,7 @@ fun HomeScreen(
     Scaffold(containerColor = Color.Transparent) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(horizontal = 20.dp, vertical = 14.dp),
+            contentPadding = PaddingValues(start = 20.dp, top = 14.dp, end = 20.dp, bottom = 116.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
         ) {
             item { HomeHeader(onOpenSettings) }

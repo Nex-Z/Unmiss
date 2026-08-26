@@ -20,7 +20,6 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -142,7 +141,7 @@ private fun EnabledAppsLayer(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 116.dp),
     ) {
         item {
             Row(
@@ -175,7 +174,7 @@ private fun EnabledAppsLayer(
             }
         } else {
             itemsIndexed(apps, key = { _, app -> app.packageName }) { index, app ->
-                AppGroupRow(index, apps.size) {
+                AppGroupRow {
                     AppRow(app = app, trailing = {
                         AdaptiveLiquidSwitch(checked = true, onCheckedChange = { onRemove(app.packageName) })
                     })
@@ -196,7 +195,7 @@ private fun AddAppsLayer(
 ) {
     LazyColumn(
         modifier = modifier.fillMaxSize(),
-        contentPadding = PaddingValues(horizontal = 20.dp, vertical = 12.dp),
+        contentPadding = PaddingValues(start = 20.dp, top = 12.dp, end = 20.dp, bottom = 116.dp),
     ) {
         item {
             Text(
@@ -236,7 +235,7 @@ private fun AddAppsLayer(
             }
         } else {
             itemsIndexed(apps, key = { _, app -> app.packageName }) { index, app ->
-                AppGroupRow(index, apps.size) {
+                AppGroupRow {
                     AppRow(app = app, trailing = {
                         AdaptiveLiquidButton(onClick = { onAdd(app.packageName) }) { Text("添加") }
                     })
@@ -247,24 +246,12 @@ private fun AddAppsLayer(
 }
 
 @Composable
-private fun AppGroupRow(index: Int, total: Int, content: @Composable () -> Unit) {
-    val shape = when {
-        total == 1 -> RoundedCornerShape(24.dp)
-        index == 0 -> RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
-        index == total - 1 -> RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp)
-        else -> RoundedCornerShape(0.dp)
-    }
-    AdaptiveGlassSurface(shape = shape, color = Color.White.copy(alpha = 0.86f)) {
-        Column {
-            content()
-            if (index < total - 1) {
-                HorizontalDivider(
-                    modifier = Modifier.padding(start = 68.dp),
-                    color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f),
-                )
-            }
-        }
-    }
+private fun AppGroupRow(content: @Composable () -> Unit) {
+    AdaptiveGlassSurface(
+        modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp),
+        shape = RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.72f),
+    ) { content() }
 }
 
 @Composable

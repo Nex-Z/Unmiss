@@ -129,10 +129,30 @@ export const reminderEvents = pgTable(
   (t) => [index('reminder_events_reminder_idx').on(t.reminderId)],
 )
 
+export const analysisRuns = pgTable(
+  'analysis_runs',
+  {
+    id: uuid('id').primaryKey().defaultRandom(),
+    userId: uuid('user_id')
+      .notNull()
+      .references(() => users.id),
+    status: text('status').notNull().default('running'),
+    notificationCount: smallint('notification_count').notNull().default(0),
+    reminderCount: smallint('reminder_count').notNull().default(0),
+    updateCount: smallint('update_count').notNull().default(0),
+    error: text('error'),
+    result: jsonb('result'),
+    startedAt: timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+    completedAt: timestamp('completed_at', { withTimezone: true }),
+  },
+  (t) => [index('analysis_runs_user_started_idx').on(t.userId, t.startedAt)],
+)
+
 export const usersRelations = relations(users, ({ many }) => ({
   devices: many(devices),
   notifications: many(notifications),
   reminders: many(reminders),
+  analysisRuns: many(analysisRuns),
 }))
 
 export const devicesRelations = relations(devices, ({ one, many }) => ({

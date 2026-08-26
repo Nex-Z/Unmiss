@@ -39,6 +39,12 @@ interface UnmissApi {
     @retrofit2.http.GET("reminders/inbox")
     suspend fun reminderInbox(): List<ReminderDto>
 
+    @retrofit2.http.GET("reminders/history")
+    suspend fun reminderHistory(): List<ReminderDto>
+
+    @retrofit2.http.GET("analysis/runs")
+    suspend fun analysisRuns(): List<AnalysisRunDto>
+
     @retrofit2.http.POST("reminders/{id}/done")
     suspend fun completeReminder(
         @retrofit2.http.Path("id") id: String,

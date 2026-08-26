@@ -71,6 +71,42 @@ data class ReminderDto(
     val quadrant: String = "important_not_urgent",
     val status: String,
     @SerialName("remindAt") val remindAt: String,
+    @SerialName("createdAt") val createdAt: String? = null,
+    @SerialName("updatedAt") val updatedAt: String? = null,
+    @SerialName("completedAt") val completedAt: String? = null,
+)
+
+@Serializable
+data class AnalysisRunDto(
+    val id: String,
+    val status: String,
+    @SerialName("notificationCount") val notificationCount: Int,
+    @SerialName("reminderCount") val reminderCount: Int,
+    @SerialName("updateCount") val updateCount: Int,
+    val error: String? = null,
+    val result: AnalysisRunResultDto? = null,
+    @SerialName("startedAt") val startedAt: String,
+    @SerialName("completedAt") val completedAt: String? = null,
+)
+
+@Serializable
+data class AnalysisRunResultDto(
+    val reminders: List<AnalysisRunReminderDto> = emptyList(),
+    val updates: List<AnalysisRunUpdateDto> = emptyList(),
+)
+
+@Serializable
+data class AnalysisRunReminderDto(
+    val title: String,
+    val reason: String? = null,
+    val quadrant: String? = null,
+)
+
+@Serializable
+data class AnalysisRunUpdateDto(
+    val action: String,
+    val title: String? = null,
+    val reason: String? = null,
 )
 
 @Serializable

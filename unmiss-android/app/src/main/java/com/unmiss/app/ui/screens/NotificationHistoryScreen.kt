@@ -118,7 +118,7 @@ fun NotificationHistoryScreen() {
     ) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(bottom = 24.dp),
+            contentPadding = PaddingValues(bottom = 116.dp),
         ) {
             item {
                 Column(Modifier.padding(horizontal = 20.dp, vertical = 14.dp)) {

@@ -103,6 +103,13 @@ describe('Reminders (e2e)', () => {
       .set(auth)
       .expect(200)
     expect(empty.body).toEqual([])
+
+    const history = await request(app.getHttpServer())
+      .get('/api/v1/reminders/history')
+      .set(auth)
+      .expect(200)
+    expect(history.body.map((item: { status: string }) => item.status).sort())
+      .toEqual(['done', 'ignored'])
   })
 
   it('keeps digest candidates silent until the user confirms them', async () => {

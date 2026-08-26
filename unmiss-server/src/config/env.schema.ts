@@ -11,6 +11,7 @@ export const envSchema = z.object({
   AI_API_KEY: z.string().default(''),
   DEEPSEEK_API_KEY: z.string().default(''),
   AI_BASE_URL: z.string().default(''),
+  AI_TIMEOUT_MS: z.coerce.number().int().min(30_000).max(300_000).default(90_000),
   NOTIFICATION_RETENTION_DAYS: z.coerce.number().int().min(1).max(365).default(14),
   RATE_LIMIT_PER_MINUTE: z.coerce.number().int().min(10).max(10_000).default(120),
 })

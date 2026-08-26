@@ -48,12 +48,18 @@ export class NotificationAnalysisService {
         now,
         300,
       )
+      let runId: string | null = null
       try {
+        runId = await this.analysisRepository.createRun(
+          schedule.userId,
+          notifications.length,
+        )
+        let digest: NotificationDigest = { reminders: [], updates: [] }
         if (notifications.length > 0) {
           const activeReminders = await this.analysisRepository.activeReminders(
             schedule.userId,
           )
-          const digest = await this.digestNotifications(
+          digest = await this.digestNotifications(
             notifications,
             activeReminders,
             schedule.timezone,
@@ -66,11 +72,13 @@ export class NotificationAnalysisService {
           )
           processedNotifications += notifications.length
         }
+        await this.analysisRepository.completeRun(runId, digest)
         await this.analysisRepository.completeUserSchedule(schedule.userId, now)
         processedUsers += 1
       } catch (error) {
         const message = error instanceof Error ? error.message : 'unknown error'
         this.logger.warn(`scheduled digest failed for ${schedule.userId}: ${message}`)
+        if (runId) await this.analysisRepository.failRun(runId, message)
         await this.analysisRepository.releaseMany(notifications.map((item) => item.id))
         await this.analysisRepository.releaseUserSchedule(schedule.userId)
       }
@@ -126,7 +134,7 @@ export class NotificationAnalysisService {
           },
         ],
       }),
-      signal: AbortSignal.timeout(30_000),
+      signal: AbortSignal.timeout(this.config.get<number>('AI_TIMEOUT_MS') ?? 90_000),
     })
     if (!response.ok) throw new Error(`AI HTTP ${response.status}`)
     const payload = (await response.json()) as ChatCompletionResponse

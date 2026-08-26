@@ -4,7 +4,7 @@ import { eq } from 'drizzle-orm'
 import request from 'supertest'
 import { AppModule } from '../src/app.module'
 import { DRIZZLE, type DrizzleDB } from '../src/database/database.module'
-import { devices, users } from '../src/database/schema'
+import { analysisRuns, devices, users } from '../src/database/schema'
 
 describe('Analysis schedule (e2e)', () => {
   let app: INestApplication
@@ -29,6 +29,7 @@ describe('Analysis schedule (e2e)', () => {
   })
 
   afterAll(async () => {
+    await db.delete(analysisRuns).where(eq(analysisRuns.userId, userId))
     await db.delete(devices).where(eq(devices.userId, userId))
     await db.delete(users).where(eq(users.id, userId))
     await app.close()
@@ -63,5 +64,24 @@ describe('Analysis schedule (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .send({ times: ['22:00'], timezone: 'Mars/Olympus' })
       .expect(400)
+  })
+
+  it('returns persisted digest attempts', async () => {
+    await db.insert(analysisRuns).values({
+      userId,
+      status: 'failed',
+      notificationCount: 41,
+      error: 'timeout',
+      completedAt: new Date(),
+    })
+
+    await request(app.getHttpServer())
+      .get('/api/v1/analysis/runs')
+      .set('Authorization', `Bearer ${token}`)
+      .expect(200)
+      .expect(({ body }) => {
+        expect(body).toHaveLength(1)
+        expect(body[0]).toMatchObject({ status: 'failed', notificationCount: 41 })
+      })
   })
 })
