@@ -3,6 +3,7 @@ package com.unmiss.app.ui.theme
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -159,12 +160,14 @@ fun LiquidGlass(
                 effects = {
                     if (intensity > 0f) {
                         if (!navigation) vibrancy()
-                        blur((if (navigation) 15.dp.toPx() * navigationResponse else (if (panel) 10.dp else 8.dp).toPx() * intensity))
-                        lens(
-                            refractionHeight = (if (navigation) 4.dp else if (panel) 7.dp else 18.dp).toPx() * intensity,
-                            refractionAmount = (if (navigation) 6.dp else if (panel) 10.dp else 24.dp).toPx() * intensity,
-                            chromaticAberration = !navigation && !panel && intensity >= 0.35f,
-                        )
+                        blur((if (navigation) 36.dp.toPx() * navigationResponse else (if (panel) 10.dp else 8.dp).toPx() * intensity))
+                        if (!navigation) {
+                            lens(
+                                refractionHeight = (if (panel) 7.dp else 18.dp).toPx() * intensity,
+                                refractionAmount = (if (panel) 10.dp else 24.dp).toPx() * intensity,
+                                chromaticAberration = !panel && intensity >= 0.35f,
+                            )
+                        }
                     }
                 },
                 highlight = if (enhanced) {
@@ -181,6 +184,10 @@ fun LiquidGlass(
                 onDrawSurface = {
                     drawRect(Color.White.copy(alpha = surfaceAlpha.coerceIn(0f, 1f) * intensity))
                 },
+            )
+            .background(
+                color = Color.White.copy(alpha = if (navigation) 0.18f * intensity else 0f),
+                shape = shape,
             )
             .border(
                 width = 1.dp,
@@ -246,12 +253,14 @@ fun Modifier.liquidNavigationIndicator(
         shape = { shape },
         effects = {
             if (intensity > 0f) {
-                blur((if (dragging) 8.dp else 10.dp).toPx() * navigationResponse)
-                lens(
-                    refractionHeight = (if (dragging) 7.dp else 4.dp).toPx() * intensity,
-                    refractionAmount = (if (dragging) 10.dp else 6.dp).toPx() * intensity,
-                    chromaticAberration = dragging && intensity >= 0.6f,
-                )
+                blur((if (dragging) 10.dp else 28.dp).toPx() * navigationResponse)
+                if (dragging) {
+                    lens(
+                        refractionHeight = 7.dp.toPx() * intensity,
+                        refractionAmount = 10.dp.toPx() * intensity,
+                        chromaticAberration = intensity >= 0.6f,
+                    )
+                }
             }
         },
         highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.9f else 0.68f) * intensity) },

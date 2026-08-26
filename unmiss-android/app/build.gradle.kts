@@ -31,8 +31,8 @@ android {
         applicationId = "com.unmiss.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 23
-        versionName = "0.5.8"
+        versionCode = 24
+        versionName = "0.5.9"
     }
 
     buildTypes {
