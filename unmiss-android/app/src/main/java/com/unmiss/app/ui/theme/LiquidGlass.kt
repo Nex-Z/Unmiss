@@ -157,8 +157,8 @@ fun LiquidGlass(
                 shape = { shape },
                 effects = {
                     if (intensity > 0f) {
-                        vibrancy()
-                        blur((if (navigation) 4.dp else if (panel) 10.dp else 8.dp).toPx() * intensity)
+                        if (!navigation) vibrancy()
+                        blur((if (navigation) 7.dp else if (panel) 10.dp else 8.dp).toPx() * intensity)
                         lens(
                             refractionHeight = (if (navigation) 13.dp else if (panel) 7.dp else 18.dp).toPx() * intensity,
                             refractionAmount = (if (navigation) 20.dp else if (panel) 10.dp else 24.dp).toPx() * intensity,
@@ -244,7 +244,6 @@ fun Modifier.liquidNavigationIndicator(
         shape = { shape },
         effects = {
             if (intensity > 0f) {
-                vibrancy()
                 blur((if (dragging) 3.dp else 5.dp).toPx() * intensity)
                 lens(
                     refractionHeight = (if (dragging) 18.dp else 12.dp).toPx() * intensity,
@@ -264,8 +263,8 @@ fun Modifier.liquidNavigationIndicator(
             InnerShadow(radius = 6.dp, alpha = (if (dragging) 0.48f else 0.32f) * intensity)
         },
         onDrawSurface = {
-            drawRect(Color.White.copy(alpha = 0.18f * intensity))
-            drawRect(tint.copy(alpha = (if (dragging) 0.16f else 0.11f) * intensity))
+            drawRect(Color.White.copy(alpha = 0.22f * intensity))
+            drawRect(tint.copy(alpha = (if (dragging) 0.13f else 0.08f) * intensity))
         },
     ).border(
         width = 0.8.dp,

@@ -240,7 +240,7 @@ private fun DraggableLiquidBottomBar(
             modifier = Modifier.fillMaxWidth(),
             cornerRadius = 34,
             navigation = true,
-            surfaceAlpha = 0.08f,
+            surfaceAlpha = 0.24f,
         ) {
             BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(64.dp)) {
                 val tabWidthPx = constraints.maxWidth.toFloat() / items.size
