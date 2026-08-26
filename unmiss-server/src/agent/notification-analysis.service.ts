@@ -134,7 +134,7 @@ export class NotificationAnalysisService {
           },
         ],
       }),
-      signal: AbortSignal.timeout(this.config.get<number>('AI_TIMEOUT_MS') ?? 90_000),
+      signal: AbortSignal.timeout(this.config.get<number>('AI_TIMEOUT_MS') ?? 180_000),
     })
     if (!response.ok) throw new Error(`AI HTTP ${response.status}`)
     const payload = (await response.json()) as ChatCompletionResponse
