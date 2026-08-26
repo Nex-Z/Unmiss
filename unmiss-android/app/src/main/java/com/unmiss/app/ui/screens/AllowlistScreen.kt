@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -28,7 +27,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
@@ -51,6 +49,7 @@ import androidx.compose.ui.unit.dp
 import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
+import com.unmiss.app.ui.components.InstalledAppIcon
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import com.unmiss.app.ui.theme.AdaptiveLiquidButton
 import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
@@ -275,11 +274,11 @@ private fun AppRow(app: InstalledApp, trailing: @Composable () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Surface(shape = CircleShape, color = MaterialTheme.colorScheme.primaryContainer, modifier = Modifier.size(42.dp)) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-                Text(app.displayName.take(1).uppercase(), fontWeight = FontWeight.Bold)
-            }
-        }
+        InstalledAppIcon(
+            packageName = app.packageName,
+            fallbackLabel = app.displayName,
+            modifier = Modifier.size(42.dp),
+        )
         Column(modifier = Modifier.weight(1f)) {
             Text(app.displayName, style = MaterialTheme.typography.bodyLarge, fontWeight = FontWeight.Medium)
             Text(

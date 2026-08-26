@@ -47,7 +47,6 @@ import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
-import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
@@ -83,8 +82,8 @@ fun AdaptiveLiquidButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) 0.94f else 1f,
-        spring(dampingRatio = 0.58f, stiffness = 640f),
+        if (pressed) 0.965f else 1f,
+        spring(dampingRatio = 0.68f, stiffness = 720f),
         label = "liquid button press",
     )
     val primary = MaterialTheme.colorScheme.primary
@@ -99,7 +98,7 @@ fun AdaptiveLiquidButton(
     CompositionLocalProvider(LocalContentColor provides contentColor) {
         Row(
             modifier = modifier
-                .defaultMinSize(minHeight = 48.dp)
+                .defaultMinSize(minHeight = 46.dp)
                 .graphicsLayer {
                     scaleX = scale
                     scaleY = scale
@@ -107,25 +106,24 @@ fun AdaptiveLiquidButton(
                 }
                 .drawBackdrop(
                     backdrop = backdrop,
-                    shape = { RoundedCornerShape(24.dp) },
+                    shape = { RoundedCornerShape(23.dp) },
                     effects = {
-                        vibrancy()
-                        blur((if (pressed) 2.dp else 5.dp).toPx())
+                        blur((if (pressed) 2.dp else 3.dp).toPx())
                         lens(
-                            (if (pressed) 18.dp else 11.dp).toPx(),
-                            (if (pressed) 26.dp else 17.dp).toPx(),
+                            (if (pressed) 12.dp else 8.dp).toPx(),
+                            (if (pressed) 18.dp else 12.dp).toPx(),
                             chromaticAberration = pressed,
                         )
                     },
-                    highlight = { Highlight.Default.copy(alpha = if (pressed) 0.9f else 0.58f) },
-                    shadow = { Shadow(radius = 7.dp, color = Color.Black.copy(alpha = 0.08f)) },
-                    innerShadow = { InnerShadow(radius = 5.dp, alpha = 0.34f) },
+                    highlight = { Highlight.Default.copy(alpha = if (pressed) 0.62f else 0.42f) },
+                    shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.045f)) },
+                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.18f) },
                     onDrawSurface = {
                         when (style) {
-                            GlassButtonStyle.PRIMARY -> drawRect(primary.copy(alpha = 0.72f))
-                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.24f))
-                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.18f))
-                            GlassButtonStyle.DANGER -> drawRect(error.copy(alpha = 0.10f))
+                            GlassButtonStyle.PRIMARY -> drawRect(primary.copy(alpha = 0.56f))
+                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.16f))
+                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.12f))
+                            GlassButtonStyle.DANGER -> drawRect(error.copy(alpha = 0.06f))
                         }
                     },
                 )
@@ -159,24 +157,24 @@ fun AdaptiveLiquidIconButton(
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        if (pressed) 0.88f else 1f,
-        spring(dampingRatio = 0.55f, stiffness = 700f),
+        if (pressed) 0.93f else 1f,
+        spring(dampingRatio = 0.68f, stiffness = 720f),
         label = "liquid icon press",
     )
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(44.dp)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .drawBackdrop(
                 backdrop = backdrop,
                 shape = { CircleShape },
                 effects = {
-                    blur(4.dp.toPx())
-                    lens(12.dp.toPx(), 20.dp.toPx(), chromaticAberration = pressed)
+                    blur(2.5.dp.toPx())
+                    lens(7.dp.toPx(), 11.dp.toPx(), chromaticAberration = pressed)
                 },
-                highlight = { Highlight.Default.copy(alpha = 0.62f) },
-                shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.06f)) },
-                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.22f)) },
+                highlight = { Highlight.Default.copy(alpha = 0.42f) },
+                shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.04f)) },
+                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.14f)) },
             )
             .clickable(
                 interactionSource = interaction,
@@ -210,9 +208,10 @@ fun AdaptiveLiquidSwitch(
     val primary = MaterialTheme.colorScheme.primary
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
-    val travelPx = with(density) { 22.dp.toPx() }
+    val travelPx = with(density) { 20.dp.toPx() }
     val position = remember { androidx.compose.animation.core.Animatable(if (checked) 1f else 0f) }
     var dragging by remember { mutableStateOf(false) }
+    val interaction = remember { MutableInteractionSource() }
 
     LaunchedEffect(checked) {
         if (!dragging) {
@@ -237,17 +236,19 @@ fun AdaptiveLiquidSwitch(
 
     Box(
         modifier = modifier
-            .size(width = 56.dp, height = 32.dp)
+            .size(width = 51.dp, height = 31.dp)
             .graphicsLayer { alpha = if (enabled) 1f else 0.46f }
             .background(
                 lerp(
-                    Color(0xFFD4D7DD),
-                    primary.copy(alpha = 0.78f),
+                    Color(0xFFE2E4E8),
+                    primary.copy(alpha = 0.88f),
                     position.value,
                 ),
                 RoundedCornerShape(16.dp),
             )
             .clickable(
+                interactionSource = interaction,
+                indication = null,
                 enabled = enabled,
                 role = Role.Switch,
                 onClick = { onCheckedChange(!checked) },
@@ -270,31 +271,27 @@ fun AdaptiveLiquidSwitch(
             modifier = Modifier
                 .graphicsLayer {
                     translationX = 3.dp.toPx() + position.value * travelPx
-                    scaleX = if (dragging) 1.22f else 1f
-                    scaleY = if (dragging) 0.9f else 1f
+                    scaleX = if (dragging) 1.08f else 1f
+                    scaleY = if (dragging) 0.96f else 1f
                 }
-                .size(28.dp)
+                .size(27.dp)
                 .drawBackdrop(
                     backdrop = backdrop,
                     shape = { CircleShape },
                     effects = {
-                        blur((if (dragging) 2.dp else 5.dp).toPx())
+                        blur((if (dragging) 1.5.dp else 2.5.dp).toPx())
                         lens(
-                            (if (dragging) 15.dp else 8.dp).toPx(),
-                            (if (dragging) 22.dp else 14.dp).toPx(),
+                            (if (dragging) 8.dp else 5.dp).toPx(),
+                            (if (dragging) 12.dp else 8.dp).toPx(),
                             chromaticAberration = dragging,
                         )
                     },
-                    highlight = { Highlight.Default.copy(alpha = if (dragging) 0.9f else 0.68f) },
-                    shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.12f)) },
-                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.3f) },
+                    highlight = { Highlight.Default.copy(alpha = if (dragging) 0.62f else 0.46f) },
+                    shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f)) },
+                    innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.14f) },
                     onDrawSurface = {
-                        drawRect(
-                            primary.copy(
-                                alpha = 0.18f + position.value * 0.62f,
-                            ),
-                        )
-                        drawRect(Color.White.copy(alpha = 0.28f))
+                        drawRect(Color.White.copy(alpha = 0.78f))
+                        drawRect(primary.copy(alpha = position.value * 0.06f))
                     },
                 ),
         )

@@ -1,16 +1,21 @@
 package com.unmiss.app.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -126,6 +131,7 @@ fun RemindersScreen() {
                             }
                             items(group, key = { it.id }) { reminder ->
                                 ReminderItem(
+                                    modifier = Modifier.padding(bottom = 14.dp),
                                     reminder = reminder,
                                     quadrant = quadrant,
                                     onDone = { runAction { repository.done(reminder.id) } },
@@ -143,7 +149,6 @@ fun RemindersScreen() {
                                     },
                                     onIgnore = { runAction { repository.ignore(reminder.id) } },
                                 )
-                                HorizontalDivider(color = quadrant.color.copy(alpha = 0.18f))
                             }
                         }
                     }
@@ -155,6 +160,7 @@ fun RemindersScreen() {
 
 @Composable
 private fun ReminderItem(
+    modifier: Modifier = Modifier,
     reminder: LocalReminder,
     quadrant: QuadrantStyle,
     onDone: () -> Unit,
@@ -163,15 +169,22 @@ private fun ReminderItem(
     onIgnore: () -> Unit,
 ) {
     AdaptiveGlassSurface(
-        modifier = Modifier
-            .fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-        color = quadrant.color.copy(alpha = 0.075f),
+        color = Color.White.copy(alpha = 0.30f),
     ) {
-      Column(
-        modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
-      ) {
+      Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
+        Box(
+            modifier = Modifier
+                .width(6.dp)
+                .fillMaxHeight()
+                .padding(vertical = 8.dp)
+                .background(quadrant.color, androidx.compose.foundation.shape.RoundedCornerShape(3.dp)),
+        )
+        Column(
+          modifier = Modifier.padding(start = 14.dp, end = 16.dp, top = 18.dp, bottom = 18.dp),
+          verticalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -211,7 +224,8 @@ private fun ReminderItem(
             }
             TextButton(onClick = onIgnore) { Text("忽略") }
         }
-    }
+        }
+      }
     }
 }
 

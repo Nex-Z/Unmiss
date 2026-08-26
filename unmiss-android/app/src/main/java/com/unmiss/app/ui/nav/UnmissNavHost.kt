@@ -6,6 +6,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -79,8 +80,8 @@ fun UnmissNavHost() {
     val navController = rememberNavController()
     val items = listOf(
         BottomNavItem(Routes.HOME, "首页", Icons.Filled.Home),
-        BottomNavItem(Routes.HISTORY, "收录", Icons.Filled.History),
         BottomNavItem(Routes.REMINDERS, "提醒", Icons.Filled.Notifications),
+        BottomNavItem(Routes.HISTORY, "收录", Icons.Filled.History),
         BottomNavItem(Routes.ALLOWLIST, "应用", Icons.Filled.Apps),
     )
     val currentRoute = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -156,6 +157,7 @@ private fun ClassicBottomBar(
             Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 6.dp, vertical = 5.dp), horizontalArrangement = Arrangement.spacedBy(2.dp)) {
                 items.forEach { item ->
                     val selected = currentRoute == item.route
+                    val interactionSource = remember { MutableInteractionSource() }
                     val color by animateColorAsState(
                         if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
                         label = "tab color",
@@ -165,7 +167,11 @@ private fun ClassicBottomBar(
                         modifier = Modifier
                             .weight(1f)
                             .height(54.dp)
-                            .clickable { onSelect(item.route) },
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null,
+                                onClick = { onSelect(item.route) },
+                            ),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.Center,
                     ) {
@@ -279,6 +285,7 @@ private fun DraggableLiquidBottomBar(
                 ) {
                     items.forEachIndexed { index, item ->
                         val selected = activeIndex == index
+                        val interactionSource = remember { MutableInteractionSource() }
                         val color by animateColorAsState(
                             if (selected) MaterialTheme.colorScheme.primary
                             else MaterialTheme.colorScheme.onSurfaceVariant,
@@ -293,7 +300,10 @@ private fun DraggableLiquidBottomBar(
                             modifier = Modifier
                                 .weight(1f)
                                 .height(64.dp)
-                                .clickable {
+                                .clickable(
+                                    interactionSource = interactionSource,
+                                    indication = null,
+                                ) {
                                     dragging = false
                                     dragPosition = index.toFloat()
                                     scope.launch {

@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
@@ -37,7 +36,6 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -59,6 +57,7 @@ import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.data.InstalledApp
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.PendingNotificationUpload
+import com.unmiss.app.ui.components.InstalledAppIcon
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
 import java.time.Instant
@@ -163,7 +162,10 @@ fun NotificationHistoryScreen() {
                 )
             }
             items(entries, key = { it.id }) { entry ->
-                NotificationHistoryRow(entry, appNames[entry.packageName] ?: entry.packageName)
+                NotificationHistoryRow(
+                    entry = entry,
+                    appName = appNames[entry.packageName] ?: entry.packageName,
+                )
                 HorizontalDivider(modifier = Modifier.padding(start = 76.dp), color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.55f))
             }
         }
@@ -308,19 +310,11 @@ private fun NotificationHistoryRow(entry: PendingNotificationUpload, appName: St
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.Top,
     ) {
-        Surface(
+        InstalledAppIcon(
+            packageName = entry.packageName,
+            fallbackLabel = appName,
             modifier = Modifier.size(42.dp),
-            shape = CircleShape,
-            color = if (uploaded) MaterialTheme.colorScheme.primaryContainer else MaterialTheme.colorScheme.surfaceVariant,
-        ) {
-            Box(contentAlignment = Alignment.Center) {
-                Text(
-                    appName.take(1).uppercase(),
-                    color = if (uploaded) MaterialTheme.colorScheme.onPrimaryContainer else MaterialTheme.colorScheme.onSurfaceVariant,
-                    fontWeight = FontWeight.Bold,
-                )
-            }
-        }
+        )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(7.dp)) {
                 Text(appName, style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), maxLines = 1)

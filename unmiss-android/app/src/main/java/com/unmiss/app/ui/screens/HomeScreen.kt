@@ -276,9 +276,9 @@ private fun HomeDestinations(
         SectionLabel("浏览")
         AdaptiveGlassSurface(shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
             Column {
-                DestinationRow(Icons.Filled.History, "通知收录", "$capturedCount 条历史通知", onOpenHistory)
-                GroupDivider()
                 DestinationRow(Icons.Filled.Notifications, "提醒事项", "$remindersCount 项待处理", onOpenReminders)
+                GroupDivider()
+                DestinationRow(Icons.Filled.History, "通知收录", "$capturedCount 条历史通知", onOpenHistory)
                 GroupDivider()
                 DestinationRow(Icons.Filled.Apps, "监听应用", "已选择 $appsCount 个应用", onOpenAllowlist)
             }
