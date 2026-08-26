@@ -3,6 +3,7 @@ package com.unmiss.app.data.prefs
 import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.floatPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -32,6 +33,19 @@ class SettingsDataStore(private val context: Context) {
 
     suspend fun setLiquidGlassEnabled(enabled: Boolean) {
         context.dataStore.edit { prefs -> prefs[LIQUID_GLASS_ENABLED_KEY] = enabled }
+    }
+
+    val liquidGlassIntensity: Flow<Float> = context.dataStore.data.map { prefs ->
+        (prefs[LIQUID_GLASS_INTENSITY_KEY] ?: DEFAULT_LIQUID_GLASS_INTENSITY)
+            .coerceIn(0f, 1f)
+    }
+
+    suspend fun liquidGlassIntensityOnce(): Float = liquidGlassIntensity.first()
+
+    suspend fun setLiquidGlassIntensity(intensity: Float) {
+        context.dataStore.edit { prefs ->
+            prefs[LIQUID_GLASS_INTENSITY_KEY] = intensity.coerceIn(0f, 1f)
+        }
     }
 
     val enabledPackages: Flow<Set<String>> = context.dataStore.data.map { prefs ->
@@ -95,9 +109,11 @@ class SettingsDataStore(private val context: Context) {
         private val BASE_URL_KEY = stringPreferencesKey("base_url")
         private val CAPTURE_ENABLED_KEY = booleanPreferencesKey("capture_enabled")
         private val LIQUID_GLASS_ENABLED_KEY = booleanPreferencesKey("liquid_glass_enabled")
+        private val LIQUID_GLASS_INTENSITY_KEY = floatPreferencesKey("liquid_glass_intensity")
         private val ANALYSIS_TIMES_KEY = stringSetPreferencesKey("analysis_times")
         private val ALLOWLIST_INITIALIZED_KEY = booleanPreferencesKey("allowlist_initialized")
         const val DEFAULT_ANALYSIS_TIME = "22:00"
+        const val DEFAULT_LIQUID_GLASS_INTENSITY = 0.65f
 
         private val DEFAULT_COMMUNICATION_PACKAGES = setOf(
             "com.tencent.mm",

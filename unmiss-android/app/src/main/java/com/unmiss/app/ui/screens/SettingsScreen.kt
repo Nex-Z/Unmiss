@@ -24,6 +24,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -48,8 +49,10 @@ import com.unmiss.app.ui.theme.AdaptiveLiquidIconButton
 import com.unmiss.app.ui.theme.AdaptiveLiquidSwitch
 import com.unmiss.app.ui.theme.GlassButtonStyle
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.delay
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,6 +64,8 @@ fun SettingsScreen(onBack: () -> Unit) {
     var saved by remember { mutableStateOf(false) }
     var captureEnabled by remember { mutableStateOf(true) }
     var liquidGlassEnabled by remember { mutableStateOf(true) }
+    var liquidGlassIntensity by remember { mutableStateOf(0.65f) }
+    var liquidGlassIntensityLoaded by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
     var deleteMessage by remember { mutableStateOf<String?>(null) }
     var analysisTimes by remember { mutableStateOf(listOf("22:00")) }
@@ -110,12 +115,21 @@ fun SettingsScreen(onBack: () -> Unit) {
         baseUrl = settings.baseUrlOnce()
         captureEnabled = settings.captureEnabledOnce()
         liquidGlassEnabled = settings.liquidGlassEnabledOnce()
+        liquidGlassIntensity = settings.liquidGlassIntensityOnce()
+        liquidGlassIntensityLoaded = true
         analysisTimes = settings.analysisTimesOnce().sorted()
         runCatching { ServiceLocator.get().notificationRepository.analysisSchedule() }
             .onSuccess { remote ->
                 analysisTimes = remote.times.sorted()
                 settings.setAnalysisTimes(remote.times.toSet())
             }
+    }
+
+    LaunchedEffect(liquidGlassIntensity, liquidGlassIntensityLoaded) {
+        if (liquidGlassIntensityLoaded) {
+            delay(100)
+            settings.setLiquidGlassIntensity(liquidGlassIntensity)
+        }
     }
 
     Scaffold(
@@ -172,26 +186,52 @@ fun SettingsScreen(onBack: () -> Unit) {
             }
 
             AdaptiveGlassSurface(modifier = Modifier.fillMaxWidth(), shape = RoundedCornerShape(24.dp), color = Color.White.copy(alpha = 0.86f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth().padding(18.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("液态玻璃", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                Column(modifier = Modifier.fillMaxWidth().padding(18.dp)) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("液态玻璃", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                            Text(
+                                if (liquidGlassEnabled) "所有玻璃组件使用同一强度" else "使用原来的浅色半透明样式",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        AdaptiveLiquidSwitch(
+                            checked = liquidGlassEnabled,
+                            onCheckedChange = { enabled ->
+                                liquidGlassEnabled = enabled
+                                scope.launch { settings.setLiquidGlassEnabled(enabled) }
+                            },
+                        )
+                    }
+                    if (liquidGlassEnabled) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 16.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                        ) {
+                            Text("玻璃强度", style = MaterialTheme.typography.labelLarge)
+                            Text(
+                                if (liquidGlassIntensity == 0f) "纯透明" else "${(liquidGlassIntensity * 100).roundToInt()}%",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary,
+                            )
+                        }
+                        Slider(
+                            value = liquidGlassIntensity,
+                            onValueChange = { liquidGlassIntensity = it },
+                            valueRange = 0f..1f,
+                            modifier = Modifier.fillMaxWidth(),
+                        )
                         Text(
-                            if (liquidGlassEnabled) "全局折射、模糊与材质层已开启" else "使用原来的浅色半透明样式",
+                            "最低为纯透明；向右增加染色、模糊、折射与边缘高光。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
                     }
-                    AdaptiveLiquidSwitch(
-                        checked = liquidGlassEnabled,
-                        onCheckedChange = { enabled ->
-                            liquidGlassEnabled = enabled
-                            scope.launch { settings.setLiquidGlassEnabled(enabled) }
-                        },
-                    )
                 }
             }
 

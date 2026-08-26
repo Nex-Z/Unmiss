@@ -79,6 +79,7 @@ fun AdaptiveLiquidButton(
     }
 
     val backdrop = LocalLiquidBackdrop.current
+    val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -89,7 +90,7 @@ fun AdaptiveLiquidButton(
     val primary = MaterialTheme.colorScheme.primary
     val error = MaterialTheme.colorScheme.error
     val contentColor = when (style) {
-        GlassButtonStyle.PRIMARY -> Color.White
+        GlassButtonStyle.PRIMARY -> lerp(primary, Color.White, intensity)
         GlassButtonStyle.SECONDARY -> primary
         GlassButtonStyle.TONAL -> MaterialTheme.colorScheme.onPrimaryContainer
         GlassButtonStyle.DANGER -> error
@@ -108,22 +109,24 @@ fun AdaptiveLiquidButton(
                     backdrop = backdrop,
                     shape = { RoundedCornerShape(23.dp) },
                     effects = {
-                        blur((if (pressed) 2.dp else 3.dp).toPx())
-                        lens(
-                            (if (pressed) 12.dp else 8.dp).toPx(),
-                            (if (pressed) 18.dp else 12.dp).toPx(),
-                            chromaticAberration = pressed,
-                        )
+                        if (intensity > 0f) {
+                            blur((if (pressed) 2.dp else 3.dp).toPx() * intensity)
+                            lens(
+                                (if (pressed) 12.dp else 8.dp).toPx() * intensity,
+                                (if (pressed) 18.dp else 12.dp).toPx() * intensity,
+                                chromaticAberration = pressed && intensity >= 0.35f,
+                            )
+                        }
                     },
-                    highlight = { Highlight.Default.copy(alpha = if (pressed) 0.62f else 0.42f) },
-                    shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.045f)) },
-                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.18f) },
+                    highlight = { Highlight.Default.copy(alpha = (if (pressed) 0.62f else 0.42f) * intensity) },
+                    shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.045f * intensity)) },
+                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.18f * intensity) },
                     onDrawSurface = {
                         when (style) {
-                            GlassButtonStyle.PRIMARY -> drawRect(primary.copy(alpha = 0.56f))
-                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.16f))
-                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.12f))
-                            GlassButtonStyle.DANGER -> drawRect(error.copy(alpha = 0.06f))
+                            GlassButtonStyle.PRIMARY -> drawRect(primary.copy(alpha = 0.56f * intensity))
+                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.16f * intensity))
+                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.12f * intensity))
+                            GlassButtonStyle.DANGER -> drawRect(error.copy(alpha = 0.06f * intensity))
                         }
                     },
                 )
@@ -154,6 +157,7 @@ fun AdaptiveLiquidIconButton(
         return
     }
     val backdrop = LocalLiquidBackdrop.current
+    val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -169,12 +173,18 @@ fun AdaptiveLiquidIconButton(
                 backdrop = backdrop,
                 shape = { CircleShape },
                 effects = {
-                    blur(2.5.dp.toPx())
-                    lens(7.dp.toPx(), 11.dp.toPx(), chromaticAberration = pressed)
+                    if (intensity > 0f) {
+                        blur(2.5.dp.toPx() * intensity)
+                        lens(
+                            7.dp.toPx() * intensity,
+                            11.dp.toPx() * intensity,
+                            chromaticAberration = pressed && intensity >= 0.35f,
+                        )
+                    }
                 },
-                highlight = { Highlight.Default.copy(alpha = 0.42f) },
-                shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.04f)) },
-                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.14f)) },
+                highlight = { Highlight.Default.copy(alpha = 0.42f * intensity) },
+                shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.04f * intensity)) },
+                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.14f * intensity)) },
             )
             .clickable(
                 interactionSource = interaction,
@@ -205,6 +215,7 @@ fun AdaptiveLiquidSwitch(
     }
 
     val backdrop = LocalLiquidBackdrop.current
+    val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
     val primary = MaterialTheme.colorScheme.primary
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
@@ -279,19 +290,21 @@ fun AdaptiveLiquidSwitch(
                     backdrop = backdrop,
                     shape = { CircleShape },
                     effects = {
-                        blur((if (dragging) 1.5.dp else 2.5.dp).toPx())
-                        lens(
-                            (if (dragging) 8.dp else 5.dp).toPx(),
-                            (if (dragging) 12.dp else 8.dp).toPx(),
-                            chromaticAberration = dragging,
-                        )
+                        if (intensity > 0f) {
+                            blur((if (dragging) 1.5.dp else 2.5.dp).toPx() * intensity)
+                            lens(
+                                (if (dragging) 8.dp else 5.dp).toPx() * intensity,
+                                (if (dragging) 12.dp else 8.dp).toPx() * intensity,
+                                chromaticAberration = dragging && intensity >= 0.35f,
+                            )
+                        }
                     },
-                    highlight = { Highlight.Default.copy(alpha = if (dragging) 0.62f else 0.46f) },
-                    shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f)) },
-                    innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.14f) },
+                    highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.62f else 0.46f) * intensity) },
+                    shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f * intensity)) },
+                    innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.14f * intensity) },
                     onDrawSurface = {
-                        drawRect(Color.White.copy(alpha = 0.78f))
-                        drawRect(primary.copy(alpha = position.value * 0.06f))
+                        drawRect(Color.White.copy(alpha = 0.78f * intensity))
+                        drawRect(primary.copy(alpha = position.value * 0.06f * intensity))
                     },
                 ),
         )

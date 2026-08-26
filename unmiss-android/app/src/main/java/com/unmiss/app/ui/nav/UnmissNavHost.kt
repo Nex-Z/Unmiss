@@ -83,6 +83,8 @@ private data class BottomNavItem(val route: String, val label: String, val icon:
 fun UnmissNavHost() {
     val liquidGlassEnabled by ServiceLocator.get().settingsDataStore.liquidGlassEnabled
         .collectAsState(initial = true)
+    val liquidGlassIntensity by ServiceLocator.get().settingsDataStore.liquidGlassIntensity
+        .collectAsState(initial = 0.65f)
     val navController = rememberNavController()
     val navigationBackdrop = rememberLayerBackdrop()
     val items = listOf(
@@ -107,7 +109,10 @@ fun UnmissNavHost() {
         UploadWorker.enqueueNow(navController.context)
     }
 
-    LiquidGlassCanvas(enabled = liquidGlassEnabled) {
+    LiquidGlassCanvas(
+        enabled = liquidGlassEnabled,
+        intensity = liquidGlassIntensity,
+    ) {
         Box(modifier = Modifier.fillMaxSize()) {
             NavHost(
                 navController = navController,

@@ -40,10 +40,12 @@ internal val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop> {
 }
 
 val LocalLiquidGlassEnabled = staticCompositionLocalOf { true }
+val LocalLiquidGlassIntensity = staticCompositionLocalOf { 0.65f }
 
 @Composable
 fun LiquidGlassCanvas(
     enabled: Boolean = true,
+    intensity: Float = 0.65f,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val backdrop = rememberLayerBackdrop()
@@ -51,6 +53,7 @@ fun LiquidGlassCanvas(
     CompositionLocalProvider(
         LocalLiquidBackdrop provides backdrop,
         LocalLiquidGlassEnabled provides enabled,
+        LocalLiquidGlassIntensity provides intensity.coerceIn(0f, 1f),
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             Canvas(
@@ -124,7 +127,8 @@ fun LiquidGlass(
 ) {
     val shape = glassShape ?: RoundedCornerShape(cornerRadius.dp)
     val backdrop = LocalLiquidBackdrop.current
-    val enhanced = LocalLiquidGlassEnabled.current
+    val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
+    val enhanced = LocalLiquidGlassEnabled.current && intensity > 0f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -152,36 +156,38 @@ fun LiquidGlass(
                 backdrop = backdrop,
                 shape = { shape },
                 effects = {
-                    vibrancy()
-                    blur((if (navigation) 4.dp else if (panel) 10.dp else 8.dp).toPx())
-                    lens(
-                        refractionHeight = (if (navigation) 13.dp else if (panel) 7.dp else 18.dp).toPx(),
-                        refractionAmount = (if (navigation) 20.dp else if (panel) 10.dp else 24.dp).toPx(),
-                        chromaticAberration = !panel,
-                    )
+                    if (intensity > 0f) {
+                        vibrancy()
+                        blur((if (navigation) 4.dp else if (panel) 10.dp else 8.dp).toPx() * intensity)
+                        lens(
+                            refractionHeight = (if (navigation) 13.dp else if (panel) 7.dp else 18.dp).toPx() * intensity,
+                            refractionAmount = (if (navigation) 20.dp else if (panel) 10.dp else 24.dp).toPx() * intensity,
+                            chromaticAberration = !panel && intensity >= 0.35f,
+                        )
+                    }
                 },
                 highlight = if (enhanced) {
-                    { Highlight.Default.copy(alpha = 0.52f) }
+                    { Highlight.Default.copy(alpha = 0.52f * intensity) }
                 } else null,
                 shadow = if (enhanced) {
                   {
-                    Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.07f))
+                    Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.07f * intensity))
                   }
                 } else null,
                 innerShadow = if (enhanced) {
-                    { InnerShadow(radius = 7.dp, alpha = 0.3f) }
+                    { InnerShadow(radius = 7.dp, alpha = 0.3f * intensity) }
                 } else null,
                 onDrawSurface = {
-                    drawRect(Color.White.copy(alpha = surfaceAlpha.coerceIn(0f, 1f)))
+                    drawRect(Color.White.copy(alpha = surfaceAlpha.coerceIn(0f, 1f) * intensity))
                 },
             )
             .border(
                 width = 1.dp,
                 brush = Brush.linearGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.96f),
-                        Color.White.copy(alpha = 0.42f),
-                        Color(0xFF5C84B7).copy(alpha = 0.16f),
+                        Color.White.copy(alpha = 0.96f * intensity),
+                        Color.White.copy(alpha = 0.42f * intensity),
+                        Color(0xFF5C84B7).copy(alpha = 0.16f * intensity),
                     ),
                 ),
                 shape = shape,
@@ -231,36 +237,39 @@ fun Modifier.liquidNavigationIndicator(
     dragging: Boolean,
 ): Modifier {
     val backdrop = LocalLiquidBackdrop.current
+    val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
     val shape = RoundedCornerShape(28.dp)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
-            vibrancy()
-            blur((if (dragging) 3.dp else 5.dp).toPx())
-            lens(
-                refractionHeight = (if (dragging) 18.dp else 12.dp).toPx(),
-                refractionAmount = (if (dragging) 28.dp else 18.dp).toPx(),
-                chromaticAberration = true,
-            )
+            if (intensity > 0f) {
+                vibrancy()
+                blur((if (dragging) 3.dp else 5.dp).toPx() * intensity)
+                lens(
+                    refractionHeight = (if (dragging) 18.dp else 12.dp).toPx() * intensity,
+                    refractionAmount = (if (dragging) 28.dp else 18.dp).toPx() * intensity,
+                    chromaticAberration = intensity >= 0.35f,
+                )
+            }
         },
-        highlight = { Highlight.Default.copy(alpha = if (dragging) 0.9f else 0.68f) },
+        highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.9f else 0.68f) * intensity) },
         shadow = {
             Shadow(
                 radius = if (dragging) 12.dp else 7.dp,
-                color = Color.Black.copy(alpha = if (dragging) 0.12f else 0.07f),
+                color = Color.Black.copy(alpha = (if (dragging) 0.12f else 0.07f) * intensity),
             )
         },
         innerShadow = {
-            InnerShadow(radius = 6.dp, alpha = if (dragging) 0.48f else 0.32f)
+            InnerShadow(radius = 6.dp, alpha = (if (dragging) 0.48f else 0.32f) * intensity)
         },
         onDrawSurface = {
-            drawRect(Color.White.copy(alpha = 0.18f))
-            drawRect(tint.copy(alpha = if (dragging) 0.16f else 0.11f))
+            drawRect(Color.White.copy(alpha = 0.18f * intensity))
+            drawRect(tint.copy(alpha = (if (dragging) 0.16f else 0.11f) * intensity))
         },
     ).border(
         width = 0.8.dp,
-        color = Color.White.copy(alpha = 0.7f),
+        color = Color.White.copy(alpha = 0.7f * intensity),
         shape = shape,
     )
 }
