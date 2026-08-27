@@ -127,8 +127,10 @@ cd unmiss-android
 | POST | `/notifications` | 上传单条通知（兼容旧客户端） | ✅ 已实现 |
 | POST | `/notifications/batch` | 批量上传最多 100 条通知（幂等） | ✅ 已实现 |
 | GET/PUT | `/devices/me/analysis-schedule` | 查询或设置多个每日归纳时刻 | ✅ 已实现 |
+| GET/PUT | `/devices/me/category-weights` | 查询或设置七类提醒的 0～5 星权重 | ✅ 已实现 |
 | GET | `/reminders/inbox` | 可能遗漏与正式提醒列表 | ✅ 已实现 |
 | GET | `/reminders/pending` | 待处理提醒列表 | ✅ 已实现 |
+| GET | `/analysis/quality` | 最近 14 天归纳与提醒质量统计 | ✅ 已实现 |
 | POST | `/reminders/:id/confirm` | 将可能遗漏确认为正式提醒 | ✅ 已实现 |
 | POST | `/reminders/:id/done` | 标记完成 | ✅ 已实现 |
 | POST | `/reminders/:id/snooze` | 稍后提醒 | ✅ 已实现 |
@@ -154,6 +156,7 @@ cd unmiss-android
 - 通知原文仅保留 7~30 天（规划），Reminder / Event 长期保存
 - Worker 默认自动清理 14 天前通知原文（可通过 `NOTIFICATION_RETENTION_DAYS` 调整）
 - 不在日志中输出通知正文
+- 类别偏好由用户显式设置，不根据 Done / Ignore 行为自动学习；0 星只过滤未来候选
 - 全部业务接口需要设备 JWT 认证
 - API 默认限制为每个设备/IP 每分钟 120 次请求；批量接口最多 100 条，请求体限制为 2 MB
 - 所有 Secret 通过 `.env` 管理，禁止提交到 Git

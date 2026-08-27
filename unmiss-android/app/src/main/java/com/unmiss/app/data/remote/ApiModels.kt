@@ -62,6 +62,35 @@ data class UpdateAnalysisScheduleRequest(
 )
 
 @Serializable
+data class CategoryWeightsDto(
+    val work: Int = 3,
+    val life: Int = 3,
+    val finance: Int = 3,
+    val health: Int = 3,
+    val social: Int = 3,
+    val entertainment: Int = 3,
+    val other: Int = 3,
+) {
+    fun asMap(): Map<String, Int> = mapOf(
+        "work" to work, "life" to life, "finance" to finance,
+        "health" to health, "social" to social,
+        "entertainment" to entertainment, "other" to other,
+    )
+
+    companion object {
+        fun fromMap(values: Map<String, Int>) = CategoryWeightsDto(
+            work = values["work"] ?: 3,
+            life = values["life"] ?: 3,
+            finance = values["finance"] ?: 3,
+            health = values["health"] ?: 3,
+            social = values["social"] ?: 3,
+            entertainment = values["entertainment"] ?: 3,
+            other = values["other"] ?: 3,
+        )
+    }
+}
+
+@Serializable
 data class ReminderDto(
     val id: String,
     val title: String,
@@ -69,6 +98,7 @@ data class ReminderDto(
     val reason: String? = null,
     val importance: Int? = null,
     val quadrant: String = "important_not_urgent",
+    val category: String = "other",
     val status: String,
     @SerialName("remindAt") val remindAt: String,
     @SerialName("createdAt") val createdAt: String? = null,
@@ -107,6 +137,51 @@ data class AnalysisRunUpdateDto(
     val action: String,
     val title: String? = null,
     val reason: String? = null,
+)
+
+@Serializable
+data class QualityStatsDto(
+    @SerialName("periodDays") val periodDays: Int,
+    @SerialName("generatedAt") val generatedAt: String,
+    val analysis: QualityAnalysisDto,
+    val reminders: QualityReminderDto,
+    val packages: List<QualityPackageDto> = emptyList(),
+    val quadrants: List<QualityQuadrantDto> = emptyList(),
+)
+
+@Serializable
+data class QualityAnalysisDto(
+    val runs: Int,
+    @SerialName("successfulRuns") val successfulRuns: Int,
+    @SerialName("failedRuns") val failedRuns: Int,
+    @SerialName("notificationsAnalyzed") val notificationsAnalyzed: Int,
+)
+
+@Serializable
+data class QualityReminderDto(
+    val created: Int,
+    val active: Int,
+    val completed: Int,
+    val ignored: Int,
+    val confirmed: Int,
+    val snoozed: Int,
+    val evaluated: Int,
+    @SerialName("usefulRate") val usefulRate: Double? = null,
+    @SerialName("ignoreRate") val ignoreRate: Double? = null,
+)
+
+@Serializable
+data class QualityPackageDto(
+    @SerialName("packageName") val packageName: String,
+    val created: Int,
+    val completed: Int,
+    val ignored: Int,
+)
+
+@Serializable
+data class QualityQuadrantDto(
+    val quadrant: String,
+    val count: Int,
 )
 
 @Serializable

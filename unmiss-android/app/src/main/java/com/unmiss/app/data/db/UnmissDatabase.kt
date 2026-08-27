@@ -35,6 +35,7 @@ data class LocalReminder(
     val reason: String?,
     val importance: Int?,
     val quadrant: String = "important_not_urgent",
+    val category: String = "other",
     val status: String,
     @ColumnInfo(name = "remind_at") val remindAt: String,
     @ColumnInfo(name = "displayed_at") val displayedAt: Long? = null,
@@ -138,7 +139,7 @@ interface ReminderDao {
 
 @Database(
     entities = [PendingNotificationUpload::class, LocalReminder::class],
-    version = 5,
+    version = 6,
     exportSchema = false,
 )
 abstract class UnmissDatabase : RoomDatabase() {
@@ -169,6 +170,12 @@ abstract class UnmissDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE reminders ADD COLUMN created_at TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE reminders ADD COLUMN updated_at TEXT DEFAULT NULL")
                 db.execSQL("ALTER TABLE reminders ADD COLUMN completed_at TEXT DEFAULT NULL")
+            }
+        }
+
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reminders ADD COLUMN category TEXT NOT NULL DEFAULT 'other'")
             }
         }
     }

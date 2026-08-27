@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
@@ -44,6 +45,7 @@ import androidx.compose.ui.graphics.Color
 import com.unmiss.app.data.ServiceLocator
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.data.remote.AnalysisRunDto
+import com.unmiss.app.data.remote.QualityStatsDto
 import com.unmiss.app.reminder.ReminderDisplayWorker
 import com.unmiss.app.ui.theme.AdaptiveGlassSurface
 import com.unmiss.app.ui.theme.AdaptiveLiquidButton
@@ -54,7 +56,7 @@ import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
-private enum class ReminderView { ITEMS, DIGESTS }
+private enum class ReminderView { ITEMS, DIGESTS, QUALITY }
 private enum class ReminderStatusFilter(val label: String) {
     ACTIVE("进行中"), DONE("已完成"), IGNORED("已忽略"), ALL("全部")
 }
@@ -71,12 +73,17 @@ fun RemindersScreen() {
     var view by remember { mutableStateOf(ReminderView.ITEMS) }
     var statusFilter by remember { mutableStateOf(ReminderStatusFilter.ACTIVE) }
     var quadrantFilter by remember { mutableStateOf<String?>(null) }
+    var categoryFilter by remember { mutableStateOf<String?>(null) }
     var query by remember { mutableStateOf("") }
     var analysisRuns by remember { mutableStateOf<List<AnalysisRunDto>>(emptyList()) }
+    var qualityStats by remember { mutableStateOf<QualityStatsDto?>(null) }
+    var categoryWeights by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
     suspend fun refresh() {
         repository.sync()
         analysisRuns = repository.analysisRuns()
+        qualityStats = repository.qualityStats()
+        categoryWeights = repository.categoryWeights().asMap()
     }
 
     LaunchedEffect(Unit) {
@@ -129,17 +136,20 @@ fun RemindersScreen() {
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
             }
-            if (view == ReminderView.DIGESTS) {
-                AnalysisRunList(analysisRuns)
-            } else {
-                ReminderHistory(
+            when (view) {
+                ReminderView.DIGESTS -> AnalysisRunList(analysisRuns)
+                ReminderView.QUALITY -> QualityReport(qualityStats)
+                ReminderView.ITEMS -> ReminderHistory(
                     reminders = reminders,
                     query = query,
                     statusFilter = statusFilter,
                     quadrantFilter = quadrantFilter,
+                    categoryFilter = categoryFilter,
+                    categoryWeights = categoryWeights,
                     onQueryChange = { query = it },
                     onStatusChange = { statusFilter = it },
                     onQuadrantChange = { quadrantFilter = it },
+                    onCategoryChange = { categoryFilter = it },
                     onDone = { reminder -> runAction { repository.done(reminder.id) } },
                     onConfirm = { reminder ->
                         runAction {
@@ -172,7 +182,10 @@ private fun ReminderToolbar(
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(
+            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
             FilterChip(
                 selected = view == ReminderView.ITEMS,
                 onClick = { onViewChange(ReminderView.ITEMS) },
@@ -183,7 +196,13 @@ private fun ReminderToolbar(
                 onClick = { onViewChange(ReminderView.DIGESTS) },
                 label = { Text("归纳记录") },
             )
+            FilterChip(
+                selected = view == ReminderView.QUALITY,
+                onClick = { onViewChange(ReminderView.QUALITY) },
+                label = { Text("统计") },
+            )
         }
+        Spacer(Modifier.width(8.dp))
         AdaptiveLiquidButton(
             enabled = !syncing,
             style = GlassButtonStyle.SECONDARY,
@@ -198,15 +217,18 @@ private fun ReminderHistory(
     query: String,
     statusFilter: ReminderStatusFilter,
     quadrantFilter: String?,
+    categoryFilter: String?,
+    categoryWeights: Map<String, Int>,
     onQueryChange: (String) -> Unit,
     onStatusChange: (ReminderStatusFilter) -> Unit,
     onQuadrantChange: (String?) -> Unit,
+    onCategoryChange: (String?) -> Unit,
     onDone: (LocalReminder) -> Unit,
     onConfirm: (LocalReminder) -> Unit,
     onSnooze: (LocalReminder) -> Unit,
     onIgnore: (LocalReminder) -> Unit,
 ) {
-    val filtered = remember(reminders, query, statusFilter, quadrantFilter) {
+    val filtered = remember(reminders, query, statusFilter, quadrantFilter, categoryFilter, categoryWeights) {
         reminders.filter { reminder ->
             val statusMatches = when (statusFilter) {
                 ReminderStatusFilter.ACTIVE -> reminder.status == "candidate" || reminder.status == "pending"
@@ -219,8 +241,10 @@ private fun ReminderHistory(
                 reminder.description.orEmpty(),
                 reminder.reason.orEmpty(),
             ).any { it.contains(query, ignoreCase = true) }
-            statusMatches && queryMatches && (quadrantFilter == null || reminder.quadrant == quadrantFilter)
-        }
+            statusMatches && queryMatches &&
+                (quadrantFilter == null || reminder.quadrant == quadrantFilter) &&
+                (categoryFilter == null || reminder.category == categoryFilter)
+        }.sortedByDescending { reminder -> categoryWeights[reminder.category] ?: 3 }
     }
 
     OutlinedTextField(
@@ -240,6 +264,23 @@ private fun ReminderHistory(
                 selected = statusFilter == filter,
                 onClick = { onStatusChange(filter) },
                 label = { Text(filter.label) },
+            )
+        }
+    }
+    Row(
+        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        FilterChip(
+            selected = categoryFilter == null,
+            onClick = { onCategoryChange(null) },
+            label = { Text("全部类别") },
+        )
+        REMINDER_CATEGORIES.forEach { category ->
+            FilterChip(
+                selected = categoryFilter == category.first,
+                onClick = { onCategoryChange(category.first) },
+                label = { Text(category.second) },
             )
         }
     }
@@ -297,6 +338,222 @@ private fun ReminderHistory(
         }
     }
 }
+
+@Composable
+private fun QualityReport(stats: QualityStatsDto?) {
+    if (stats == null) {
+        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+            Text("正在生成质量报告…", color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        return
+    }
+    val context = LocalContext.current
+    val maxQuadrant = stats.quadrants.maxOfOrNull { it.count }?.coerceAtLeast(1) ?: 1
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(top = 8.dp, bottom = 116.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        item {
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    "最近 ${stats.periodDays} 天",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+                )
+                Text(
+                    if (stats.reminders.evaluated == 0) "还没有已评价样本，不展示任何通知正文"
+                    else "基于 ${stats.reminders.evaluated} 个已评价提醒，不展示任何通知正文",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        }
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                QualityMetric(
+                    modifier = Modifier.weight(1f),
+                    value = formatRate(stats.reminders.usefulRate),
+                    label = "保留率",
+                    note = "确认或完成",
+                    color = Color(0xFF2F8A65),
+                )
+                QualityMetric(
+                    modifier = Modifier.weight(1f),
+                    value = formatRate(stats.reminders.ignoreRate),
+                    label = "筛除率",
+                    note = "用户最终判断",
+                    color = Color(0xFFC06B43),
+                )
+            }
+        }
+        item {
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                color = Color.White.copy(alpha = 0.30f),
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    Text("提醒结果", style = MaterialTheme.typography.titleMedium)
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        CompactCount("生成", stats.reminders.created, Modifier.weight(1f))
+                        CompactCount("确认", stats.reminders.confirmed, Modifier.weight(1f))
+                        CompactCount("完成", stats.reminders.completed, Modifier.weight(1f))
+                    }
+                    Row(modifier = Modifier.fillMaxWidth()) {
+                        CompactCount("忽略", stats.reminders.ignored, Modifier.weight(1f))
+                        CompactCount("延后", stats.reminders.snoozed, Modifier.weight(1f))
+                        CompactCount("待处理", stats.reminders.active, Modifier.weight(1f))
+                    }
+                }
+            }
+        }
+        item {
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth(),
+                shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                color = Color.White.copy(alpha = 0.30f),
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("归纳健康", style = MaterialTheme.typography.titleMedium)
+                    Text(
+                        "分析 ${stats.analysis.notificationsAnalyzed} 条通知 · " +
+                            "成功 ${stats.analysis.successfulRuns} 次 · 失败 ${stats.analysis.failedRuns} 次",
+                        style = MaterialTheme.typography.bodyMedium,
+                    )
+                    val successRate = if (stats.analysis.runs == 0) null
+                    else stats.analysis.successfulRuns.toDouble() / stats.analysis.runs
+                    Text(
+                        "运行成功率 ${formatRate(successRate)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+            }
+        }
+        if (stats.quadrants.isNotEmpty()) {
+            item {
+                AdaptiveGlassSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                    color = Color.White.copy(alpha = 0.30f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("优先级分布", style = MaterialTheme.typography.titleMedium)
+                        stats.quadrants.forEach { item ->
+                            val style = QUADRANTS.firstOrNull { it.id == item.quadrant }
+                            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                ) {
+                                    Text(style?.label ?: item.quadrant, style = MaterialTheme.typography.bodySmall)
+                                    Text(item.count.toString(), style = MaterialTheme.typography.labelMedium)
+                                }
+                                Box(
+                                    modifier = Modifier.fillMaxWidth().height(7.dp)
+                                        .background(MaterialTheme.colorScheme.surfaceVariant, androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth(item.count.toFloat() / maxQuadrant)
+                                            .height(7.dp)
+                                            .background(style?.color ?: MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(4.dp)),
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (stats.packages.isNotEmpty()) {
+            item {
+                AdaptiveGlassSurface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+                    color = Color.White.copy(alpha = 0.30f),
+                ) {
+                    Column(
+                        modifier = Modifier.padding(18.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp),
+                    ) {
+                        Text("来源应用", style = MaterialTheme.typography.titleMedium)
+                        stats.packages.forEach { item ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(appLabel(context, item.packageName), style = MaterialTheme.typography.bodyMedium)
+                                    Text(
+                                        item.packageName,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                                Text(
+                                    "${item.created} 项 · ${item.completed} 完成 · ${item.ignored} 忽略",
+                                    style = MaterialTheme.typography.bodySmall,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun QualityMetric(
+    modifier: Modifier,
+    value: String,
+    label: String,
+    note: String,
+    color: Color,
+) {
+    AdaptiveGlassSurface(
+        modifier = modifier,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
+        color = Color.White.copy(alpha = 0.30f),
+    ) {
+        Column(modifier = Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+            Text(value, style = MaterialTheme.typography.headlineMedium, color = color)
+            Text(label, style = MaterialTheme.typography.titleSmall)
+            Text(note, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+    }
+}
+
+@Composable
+private fun CompactCount(label: String, value: Int, modifier: Modifier) {
+    Column(modifier = modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(value.toString(), style = MaterialTheme.typography.titleLarge)
+        Text(label, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+    }
+}
+
+private fun formatRate(rate: Double?): String = rate?.let { "%.0f%%".format(it * 100) } ?: "—"
+
+private fun appLabel(context: android.content.Context, packageName: String): String = runCatching {
+    val info = context.packageManager.getApplicationInfo(packageName, 0)
+    context.packageManager.getApplicationLabel(info).toString()
+}.getOrDefault(packageName.substringAfterLast('.'))
 
 @Composable
 private fun AnalysisRunList(runs: List<AnalysisRunDto>) {
@@ -418,12 +675,19 @@ private fun ReminderItem(
                 style = MaterialTheme.typography.titleMedium,
             )
             Text(
-                quadrant.shortLabel,
+                "${categoryLabel(reminder.category)} · ${quadrant.shortLabel}",
                 style = MaterialTheme.typography.labelSmall,
                 color = quadrant.color,
             )
         }
         reminder.description?.let { Text(it, style = MaterialTheme.typography.bodyMedium) }
+        reminder.reason?.takeIf { it.isNotBlank() }?.let {
+            Text(
+                "判断依据 · $it",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
         Text(
             when (reminder.status) {
                 "candidate" -> "归纳发现 · 等待你确认"
@@ -466,6 +730,19 @@ private fun formatTime(value: String): String = runCatching {
         .withZone(ZoneId.systemDefault())
         .format(Instant.parse(value))
 }.getOrDefault(value)
+
+private fun categoryLabel(category: String): String =
+    REMINDER_CATEGORIES.firstOrNull { it.first == category }?.second ?: "其他"
+
+private val REMINDER_CATEGORIES = listOf(
+    "work" to "工作",
+    "life" to "生活",
+    "finance" to "财务",
+    "health" to "健康",
+    "social" to "社交",
+    "entertainment" to "娱乐",
+    "other" to "其他",
+)
 
 private data class QuadrantStyle(
     val id: String,

@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.floatPreferencesKey
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
@@ -102,6 +103,24 @@ class SettingsDataStore(private val context: Context) {
         }
     }
 
+    val categoryWeights: Flow<Map<String, Int>> = context.dataStore.data.map { prefs ->
+        CATEGORY_IDS.associateWith { id ->
+            (prefs[intPreferencesKey("category_weight_$id")] ?: DEFAULT_CATEGORY_WEIGHT)
+                .coerceIn(0, 5)
+        }
+    }
+
+    suspend fun categoryWeightsOnce(): Map<String, Int> = categoryWeights.first()
+
+    suspend fun setCategoryWeights(weights: Map<String, Int>) {
+        context.dataStore.edit { prefs ->
+            CATEGORY_IDS.forEach { id ->
+                prefs[intPreferencesKey("category_weight_$id")] =
+                    (weights[id] ?: DEFAULT_CATEGORY_WEIGHT).coerceIn(0, 5)
+            }
+        }
+    }
+
     companion object {
         const val DEFAULT_BASE_URL = "http://10.0.2.2:3000/api/v1"
 
@@ -114,6 +133,10 @@ class SettingsDataStore(private val context: Context) {
         private val ALLOWLIST_INITIALIZED_KEY = booleanPreferencesKey("allowlist_initialized")
         const val DEFAULT_ANALYSIS_TIME = "22:00"
         const val DEFAULT_LIQUID_GLASS_INTENSITY = 0.65f
+        const val DEFAULT_CATEGORY_WEIGHT = 3
+        val CATEGORY_IDS = listOf(
+            "work", "life", "finance", "health", "social", "entertainment", "other",
+        )
 
         private val DEFAULT_COMMUNICATION_PACKAGES = setOf(
             "com.tencent.mm",

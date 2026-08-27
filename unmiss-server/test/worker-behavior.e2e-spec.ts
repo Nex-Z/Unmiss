@@ -146,6 +146,7 @@ describe('Worker behavior (e2e)', () => {
         sourceNotificationId: notification!.id,
         title: 'Plan the report',
         reason: 'explicit unfinished request',
+        category: 'work',
         quadrant: 'important_not_urgent',
         remindAt: new Date(Date.now() + 3_600_000).toISOString(),
       }],
@@ -164,5 +165,53 @@ describe('Worker behavior (e2e)', () => {
     expect(rows.find((row) => row.id === existing!.id)?.status).toBe('done')
     expect(rows.find((row) => row.sourceNotificationId === notification!.id)?.quadrant)
       .toBe('important_not_urgent')
+  })
+
+  it('does not create future candidates for a zero-weight category', async () => {
+    const identity = await createIdentity()
+    await db
+      .update(users)
+      .set({
+        categoryWeights: {
+          work: 3,
+          life: 3,
+          finance: 3,
+          health: 3,
+          social: 3,
+          entertainment: 0,
+          other: 3,
+        },
+      })
+      .where(eq(users.id, identity.userId))
+    const [notification] = await db
+      .insert(notifications)
+      .values({
+        ...identity,
+        notificationKey: `muted-category-${Date.now()}`,
+        packageName: 'test',
+        body: 'watch a show later',
+        timezone: 'Asia/Hong_Kong',
+        postedAt: new Date(),
+      })
+      .returning({ id: notifications.id })
+    notificationIds.push(notification!.id)
+
+    await analysisRepository.saveDigest(identity.userId, [notification!.id], {
+      reminders: [{
+        sourceNotificationId: notification!.id,
+        title: 'Watch the show',
+        reason: 'explicit entertainment plan',
+        category: 'entertainment',
+        quadrant: 'not_important_not_urgent',
+        remindAt: new Date(Date.now() + 3_600_000).toISOString(),
+      }],
+      updates: [],
+    })
+
+    const rows = await db
+      .select()
+      .from(reminders)
+      .where(eq(reminders.sourceNotificationId, notification!.id))
+    expect(rows).toEqual([])
   })
 })

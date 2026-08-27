@@ -13,4 +13,9 @@ export class AnalysisController {
   runs(@CurrentDevice() device: DevicePayload) {
     return this.repository.recentRuns(device.userId)
   }
+
+  @Get('quality')
+  quality(@CurrentDevice() device: DevicePayload) {
+    return this.repository.qualityStats(device.userId)
+  }
 }

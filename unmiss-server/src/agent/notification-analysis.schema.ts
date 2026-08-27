@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { REMINDER_CATEGORIES } from '../common/reminder-categories'
 
 export const notificationAnalysisSchema = z.discriminatedUnion(
   'shouldCreateReminder',
@@ -27,11 +28,14 @@ export const reminderQuadrantSchema = z.enum([
   'not_important_not_urgent',
 ])
 
+export const reminderCategorySchema = z.enum(REMINDER_CATEGORIES)
+
 const digestReminderSchema = z.object({
   sourceNotificationId: z.string().uuid(),
   title: z.string().min(1).max(512),
   description: z.string().max(2000).optional(),
   reason: z.string().min(1).max(1000),
+  category: reminderCategorySchema,
   quadrant: reminderQuadrantSchema,
   remindAt: z.string().datetime({ offset: true }),
 })

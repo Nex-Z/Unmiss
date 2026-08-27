@@ -2,6 +2,7 @@ import { Inject, Injectable } from '@nestjs/common'
 import { eq, sql } from 'drizzle-orm'
 import { DRIZZLE, type DrizzleDB } from '../database/database.module'
 import { devices, users } from '../database/schema'
+import type { CategoryWeights } from '../common/reminder-categories'
 
 export interface DeviceRow {
   id: string
@@ -119,6 +120,29 @@ export class DevicesRepository {
       })
     if (!row) throw new Error('user not found')
     return row
+  }
+
+  async categoryWeights(userId: string): Promise<CategoryWeights> {
+    const [row] = await this.db
+      .select({ weights: users.categoryWeights })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    if (!row) throw new Error('user not found')
+    return row.weights
+  }
+
+  async updateCategoryWeights(
+    userId: string,
+    weights: CategoryWeights,
+  ): Promise<CategoryWeights> {
+    const [row] = await this.db
+      .update(users)
+      .set({ categoryWeights: weights })
+      .where(eq(users.id, userId))
+      .returning({ weights: users.categoryWeights })
+    if (!row) throw new Error('user not found')
+    return row.weights
   }
 
   async deleteUserData(userId: string): Promise<void> {

@@ -65,6 +65,12 @@ export class NotificationAnalysisService {
             schedule.timezone,
             now,
           )
+          digest = {
+            ...digest,
+            reminders: digest.reminders.filter(
+              (item) => schedule.categoryWeights[item.category] > 0,
+            ),
+          }
           await this.analysisRepository.saveDigest(
             schedule.userId,
             notifications.map((item) => item.id),
@@ -103,14 +109,20 @@ export class NotificationAnalysisService {
         }),
       )
     }
-    if (digests.length === 1) return digests[0]!
-    return this.requestDigest({
-      candidateReminders: digests.flatMap((digest) => digest.reminders),
-      candidateUpdates: digests.flatMap((digest) => digest.updates),
-      existingReminders: activeReminders.map(toPromptReminder),
-      timezone,
-      currentTime: now.toISOString(),
-      instruction: 'Deduplicate and consolidate these candidates across the full segment.',
+    const digest = digests.length === 1
+      ? digests[0]!
+      : await this.requestDigest({
+          candidateReminders: digests.flatMap((item) => item.reminders),
+          candidateUpdates: digests.flatMap((item) => item.updates),
+          existingReminders: activeReminders.map(toPromptReminder),
+          timezone,
+          currentTime: now.toISOString(),
+          instruction: 'Deduplicate and consolidate these candidates across the full segment.',
+        })
+    return sanitizeDigest(digest, {
+      notificationIds: notifications.map((item) => item.id),
+      activeReminderIds: activeReminders.map((item) => item.id),
+      now,
     })
   }
 
@@ -193,41 +205,104 @@ function localDateKey(date: Date, timezone: string): string {
 function toPromptItem(notification: NotificationRow) {
   return {
     id: notification.id,
+    notificationKey: notification.notificationKey,
     packageName: notification.packageName,
     title: notification.title?.slice(0, 512) ?? null,
     text: notification.body?.slice(0, 1500) ?? null,
     subText: notification.subText?.slice(0, 256) ?? null,
     postedAt: notification.postedAt.toISOString(),
+    timezone: notification.timezone,
   }
 }
 
 function toPromptReminder(reminder: Awaited<ReturnType<AnalysisRepository['activeReminders']>>[number]) {
   return {
     id: reminder.id,
+    sourceNotificationId: reminder.sourceNotificationId,
     title: reminder.title,
     description: reminder.description,
+    reason: reminder.reason,
     status: reminder.status,
     quadrant: reminder.quadrant,
+    category: reminder.category,
     remindAt: reminder.remindAt.toISOString(),
   }
 }
 
-const SYSTEM_PROMPT = `You review a time segment of Android notifications to find
-obligations the user may have overlooked while busy. Analyze the segment as a whole
-and compare it with existingReminders. Use later notifications as evidence of changes,
-completion, cancellation, supersession, or duplication. Prefer precision: exclude OTPs,
-ads, news, likes, recommendations, FYI messages, and ordinary chat. Never invent an
-obligation, completion, or deadline.
+export function sanitizeDigest(
+  digest: NotificationDigest,
+  context: {
+    notificationIds: string[]
+    activeReminderIds: string[]
+    now: Date
+  },
+): NotificationDigest {
+  const allowedNotifications = new Set(context.notificationIds)
+  const allowedReminders = new Set(context.activeReminderIds)
+  const sources = new Set<string>()
+  const titles = new Set<string>()
+  const updateTargets = new Set<string>()
 
-Classify every new or updated item into exactly one Eisenhower quadrant:
+  const reminders = digest.reminders.filter((item) => {
+    const titleKey = item.title.trim().toLocaleLowerCase().replace(/\s+/g, '')
+    const remindAt = new Date(item.remindAt)
+    if (!allowedNotifications.has(item.sourceNotificationId)) return false
+    if (!Number.isFinite(remindAt.getTime()) || remindAt <= context.now) return false
+    if (sources.has(item.sourceNotificationId) || titles.has(titleKey)) return false
+    sources.add(item.sourceNotificationId)
+    titles.add(titleKey)
+    return true
+  })
+
+  const updates = digest.updates.flatMap((item) => {
+    if (!allowedReminders.has(item.reminderId) || updateTargets.has(item.reminderId)) return []
+    updateTargets.add(item.reminderId)
+    if (item.action === 'update' && item.remindAt) {
+      const remindAt = new Date(item.remindAt)
+      if (!Number.isFinite(remindAt.getTime()) || remindAt <= context.now) {
+        const { remindAt: _discarded, ...withoutPastTime } = item
+        if (!withoutPastTime.title && withoutPastTime.description === undefined && !withoutPastTime.quadrant) {
+          return []
+        }
+        return [withoutPastTime]
+      }
+    }
+    return [item]
+  })
+
+  return { reminders, updates }
+}
+
+const SYSTEM_PROMPT = `You review a chronological time segment of Android notifications
+to find concrete obligations the user may have overlooked while busy. Analyze the
+segment as a whole and compare it with existingReminders.
+
+Apply this precision-first gate before creating anything:
+1. There must be an explicit action expected from the device owner, not merely an event,
+   status update, suggestion, or action assigned to somebody else.
+2. The source must identify what action is required. Do not infer tasks from vague chat.
+3. Later notifications may complete, cancel, replace, postpone, or duplicate earlier ones;
+   the latest explicit evidence wins. notificationKey and packageName help identify threads.
+4. Exclude OTPs, payments already completed, delivery status, ads, news, social activity,
+   recommendations, automated FYI messages, and ordinary conversation.
+5. Never invent an obligation, participant, completion, cancellation, or deadline.
+
+Prefer returning no reminder when evidence is ambiguous. Treat semantically equivalent
+items as one obligation even when wording differs. Do not recreate anything already
+covered by existingReminders; update that reminder only when new evidence changes it.
+
+Classify every new item into exactly one primary category: work, life, finance,
+health, social, entertainment, or other. Category describes the obligation domain,
+not its importance. Also classify every new or updated item into exactly one
+Eisenhower quadrant:
 important_urgent, important_not_urgent, not_important_urgent, or
 not_important_not_urgent.
 
 Return JSON only as {"reminders":[],"updates":[]}. New reminders contain
 sourceNotificationId, title, optional description, reason, quadrant, and absolute ISO
-8601 remindAt. sourceNotificationId must be an input notification id. Updates contain
+8601 remindAt, plus category. sourceNotificationId must be an input notification id. Updates contain
 reminderId, action (update, complete, or ignore), reason, and optional changed fields.
 Only complete or ignore an existing reminder when a later notification is explicit,
-high-confidence evidence. Use update for changed time, content, or quadrant. Do not
-repeat an existing reminder as new. Merge duplicates. remindAt must be after
-currentTime; without an explicit deadline, use 09:00 local time on the next day.`
+high-confidence evidence. Use update for changed time, content, or quadrant. remindAt
+must be after currentTime. Preserve explicit source deadlines. When an obligation is
+clear but has no deadline, use 09:00 in the supplied timezone on the next local day.`

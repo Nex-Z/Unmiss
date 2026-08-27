@@ -9,6 +9,10 @@ import {
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core'
+import {
+  DEFAULT_CATEGORY_WEIGHTS,
+  type CategoryWeights,
+} from '../common/reminder-categories'
 
 export const users = pgTable('users', {
   id: uuid('id').primaryKey().defaultRandom(),
@@ -21,6 +25,10 @@ export const users = pgTable('users', {
     .notNull()
     .defaultNow(),
   analysisProcessingAt: timestamp('analysis_processing_at', { withTimezone: true }),
+  categoryWeights: jsonb('category_weights')
+    .$type<CategoryWeights>()
+    .notNull()
+    .default(DEFAULT_CATEGORY_WEIGHTS),
   createdAt: timestamp('created_at', { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -94,6 +102,7 @@ export const reminders = pgTable(
     reason: text('reason'),
     importance: smallint('importance'),
     quadrant: text('quadrant').notNull().default('important_not_urgent'),
+    category: text('category').notNull().default('other'),
     status: text('status').notNull().default('pending'),
     remindAt: timestamp('remind_at', { withTimezone: true }).notNull(),
     lastShownAt: timestamp('last_shown_at', { withTimezone: true }),

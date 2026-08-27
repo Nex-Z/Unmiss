@@ -6,6 +6,7 @@ import { DevicesService } from './devices.service'
 import { RegisterDeviceDto } from './dto/register-device.dto'
 import { UpdatePushTokenDto } from './dto/update-push-token.dto'
 import { UpdateAnalysisScheduleDto } from './dto/update-analysis-schedule.dto'
+import { UpdateCategoryWeightsDto } from './dto/update-category-weights.dto'
 
 @Controller('devices')
 export class DevicesController {
@@ -39,6 +40,19 @@ export class DevicesController {
     @Body() dto: UpdateAnalysisScheduleDto,
   ) {
     return this.devicesService.updateAnalysisSchedule(device.userId, dto)
+  }
+
+  @Get('me/category-weights')
+  categoryWeights(@CurrentDevice() device: DevicePayload) {
+    return this.devicesService.categoryWeights(device.userId)
+  }
+
+  @Put('me/category-weights')
+  updateCategoryWeights(
+    @CurrentDevice() device: DevicePayload,
+    @Body() dto: UpdateCategoryWeightsDto,
+  ) {
+    return this.devicesService.updateCategoryWeights(device.userId, dto)
   }
 
   @Delete('me/data')

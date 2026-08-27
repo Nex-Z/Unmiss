@@ -50,6 +50,13 @@
       "when": 1787743760916,
       "tag": "0006_married_songbird",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1787820929718,
+      "tag": "0007_regular_marvex",
+      "breakpoints": true
     }
   ]
 }

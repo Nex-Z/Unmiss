@@ -5,6 +5,39 @@ import { analysisRuns, notifications, reminderEvents, reminders, users } from '.
 import type { NotificationRow } from '../notifications/notifications.repository'
 import type { NotificationAnalysis } from './notification-analysis.schema'
 import type { NotificationDigest } from './notification-analysis.schema'
+import {
+  DEFAULT_CATEGORY_WEIGHTS,
+  type CategoryWeights,
+} from '../common/reminder-categories'
+
+export interface QualityStats {
+  periodDays: number
+  generatedAt: string
+  analysis: {
+    runs: number
+    successfulRuns: number
+    failedRuns: number
+    notificationsAnalyzed: number
+  }
+  reminders: {
+    created: number
+    active: number
+    completed: number
+    ignored: number
+    confirmed: number
+    snoozed: number
+    evaluated: number
+    usefulRate: number | null
+    ignoreRate: number | null
+  }
+  packages: Array<{
+    packageName: string
+    created: number
+    completed: number
+    ignored: number
+  }>
+  quadrants: Array<{ quadrant: string; count: number }>
+}
 
 @Injectable()
 export class AnalysisRepository {
@@ -46,6 +79,104 @@ export class AnalysisRepository {
       .where(eq(analysisRuns.userId, userId))
       .orderBy(desc(analysisRuns.startedAt))
       .limit(limit)
+  }
+
+  async qualityStats(userId: string, periodDays = 14): Promise<QualityStats> {
+    const [analysisResult, reminderResult, eventResult, packageResult, quadrantResult] =
+      await Promise.all([
+        this.db.execute(sql`
+          SELECT
+            count(*)::int AS "runs",
+            count(*) FILTER (WHERE status = 'success')::int AS "successfulRuns",
+            count(*) FILTER (WHERE status = 'failed')::int AS "failedRuns",
+            coalesce(sum(notification_count) FILTER (WHERE status = 'success'), 0)::int
+              AS "notificationsAnalyzed"
+          FROM analysis_runs
+          WHERE user_id = ${userId}
+            AND started_at >= now() - (${periodDays} * interval '1 day')
+        `),
+        this.db.execute(sql`
+          SELECT
+            count(*)::int AS "created",
+            count(*) FILTER (WHERE status IN ('candidate', 'pending'))::int AS "active",
+            count(*) FILTER (WHERE status = 'done')::int AS "completed",
+            count(*) FILTER (WHERE status = 'ignored')::int AS "ignored"
+          FROM reminders
+          WHERE user_id = ${userId}
+            AND created_at >= now() - (${periodDays} * interval '1 day')
+        `),
+        this.db.execute(sql`
+          SELECT
+            count(*) FILTER (WHERE event.type = 'confirmed')::int AS "confirmed",
+            count(*) FILTER (WHERE event.type = 'snoozed')::int AS "snoozed",
+            count(DISTINCT CASE WHEN event.type IN ('confirmed', 'done') THEN event.reminder_id END)::int
+              AS "usefulReminders",
+            count(DISTINCT CASE WHEN event.type = 'ignored' THEN event.reminder_id END)::int
+              AS "dismissedReminders"
+          FROM reminder_events AS event
+          INNER JOIN reminders AS reminder ON reminder.id = event.reminder_id
+          WHERE reminder.user_id = ${userId}
+            AND event.created_at >= now() - (${periodDays} * interval '1 day')
+        `),
+        this.db.execute(sql`
+          SELECT
+            notification.package_name AS "packageName",
+            count(*)::int AS "created",
+            count(*) FILTER (WHERE reminder.status = 'done')::int AS "completed",
+            count(*) FILTER (WHERE reminder.status = 'ignored')::int AS "ignored"
+          FROM reminders AS reminder
+          INNER JOIN notifications AS notification
+            ON notification.id = reminder.source_notification_id
+          WHERE reminder.user_id = ${userId}
+            AND reminder.created_at >= now() - (${periodDays} * interval '1 day')
+          GROUP BY notification.package_name
+          ORDER BY count(*) DESC, notification.package_name ASC
+          LIMIT 8
+        `),
+        this.db.execute(sql`
+          SELECT quadrant, count(*)::int AS "count"
+          FROM reminders
+          WHERE user_id = ${userId}
+            AND created_at >= now() - (${periodDays} * interval '1 day')
+          GROUP BY quadrant
+          ORDER BY count(*) DESC
+        `),
+      ])
+
+    const analysis = numericRow(analysisResult.rows[0], [
+      'runs', 'successfulRuns', 'failedRuns', 'notificationsAnalyzed',
+    ])
+    const reminder = numericRow(reminderResult.rows[0], [
+      'created', 'active', 'completed', 'ignored',
+    ])
+    const events = numericRow(eventResult.rows[0], [
+      'confirmed', 'snoozed', 'usefulReminders', 'dismissedReminders',
+    ])
+    const decided = events.usefulReminders + events.dismissedReminders
+
+    return {
+      periodDays,
+      generatedAt: new Date().toISOString(),
+      analysis,
+      reminders: {
+        ...reminder,
+        confirmed: events.confirmed,
+        snoozed: events.snoozed,
+        evaluated: decided,
+        usefulRate: decided === 0 ? null : events.usefulReminders / decided,
+        ignoreRate: decided === 0 ? null : events.dismissedReminders / decided,
+      },
+      packages: packageResult.rows.map((row) => ({
+        packageName: String(row.packageName),
+        created: Number(row.created),
+        completed: Number(row.completed),
+        ignored: Number(row.ignored),
+      })),
+      quadrants: quadrantResult.rows.map((row) => ({
+        quadrant: String(row.quadrant),
+        count: Number(row.count),
+      })),
+    }
   }
 
   async claimById(id: string): Promise<NotificationRow | null> {
@@ -102,6 +233,7 @@ export class AnalysisRepository {
     userId: string
     times: string[]
     timezone: string
+    categoryWeights: CategoryWeights
     lastRunAt: Date | null
     processingAt: Date | null
   }>> {
@@ -110,6 +242,7 @@ export class AnalysisRepository {
         userId: users.id,
         times: users.analysisTimes,
         timezone: users.analysisTimezone,
+        categoryWeights: users.categoryWeights,
         lastRunAt: users.analysisLastRunAt,
         processingAt: users.analysisProcessingAt,
       })
@@ -184,10 +317,13 @@ export class AnalysisRepository {
     return this.db
       .select({
         id: reminders.id,
+        sourceNotificationId: reminders.sourceNotificationId,
         title: reminders.title,
         description: reminders.description,
+        reason: reminders.reason,
         status: reminders.status,
         quadrant: reminders.quadrant,
+        category: reminders.category,
         remindAt: reminders.remindAt,
       })
       .from(reminders)
@@ -238,8 +374,14 @@ export class AnalysisRepository {
     digest: NotificationDigest,
   ): Promise<void> {
     const allowedIds = new Set(notificationIds)
+    const [preference] = await this.db
+      .select({ weights: users.categoryWeights })
+      .from(users)
+      .where(eq(users.id, userId))
+      .limit(1)
+    const weights = preference?.weights ?? DEFAULT_CATEGORY_WEIGHTS
     const reminderValues = digest.reminders
-      .filter((item) => allowedIds.has(item.sourceNotificationId))
+      .filter((item) => allowedIds.has(item.sourceNotificationId) && weights[item.category] > 0)
       .map((item) => ({
         userId,
         sourceNotificationId: item.sourceNotificationId,
@@ -248,6 +390,7 @@ export class AnalysisRepository {
         reason: item.reason,
         importance: quadrantImportance(item.quadrant),
         quadrant: item.quadrant,
+        category: item.category,
         status: 'candidate',
         remindAt: new Date(item.remindAt),
       }))
@@ -373,4 +516,11 @@ function requiredDate(value: unknown, field: string): Date {
   const date = value instanceof Date ? value : new Date(String(value))
   if (Number.isNaN(date.getTime())) throw new Error(`invalid ${field} from database`)
   return date
+}
+
+function numericRow<K extends string>(
+  row: Record<string, unknown> | undefined,
+  keys: K[],
+): Record<K, number> {
+  return Object.fromEntries(keys.map((key) => [key, Number(row?.[key] ?? 0)])) as Record<K, number>
 }

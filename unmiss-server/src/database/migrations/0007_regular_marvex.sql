@@ -1,0 +1,2 @@
+ALTER TABLE "reminders" ADD COLUMN "category" text DEFAULT 'other' NOT NULL;--> statement-breakpoint
+ALTER TABLE "users" ADD COLUMN "category_weights" jsonb DEFAULT '{"work":3,"life":3,"finance":3,"health":3,"social":3,"entertainment":3,"other":3}'::jsonb NOT NULL;

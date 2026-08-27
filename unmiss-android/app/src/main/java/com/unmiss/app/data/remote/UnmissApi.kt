@@ -33,6 +33,14 @@ interface UnmissApi {
         @retrofit2.http.Body body: UpdateAnalysisScheduleRequest,
     ): AnalysisScheduleDto
 
+    @retrofit2.http.GET("devices/me/category-weights")
+    suspend fun categoryWeights(): CategoryWeightsDto
+
+    @retrofit2.http.PUT("devices/me/category-weights")
+    suspend fun updateCategoryWeights(
+        @retrofit2.http.Body body: CategoryWeightsDto,
+    ): CategoryWeightsDto
+
     @retrofit2.http.GET("reminders/pending")
     suspend fun pendingReminders(): List<ReminderDto>
 
@@ -44,6 +52,9 @@ interface UnmissApi {
 
     @retrofit2.http.GET("analysis/runs")
     suspend fun analysisRuns(): List<AnalysisRunDto>
+
+    @retrofit2.http.GET("analysis/quality")
+    suspend fun qualityStats(): QualityStatsDto
 
     @retrofit2.http.POST("reminders/{id}/done")
     suspend fun completeReminder(

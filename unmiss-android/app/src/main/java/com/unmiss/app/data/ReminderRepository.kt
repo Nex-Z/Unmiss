@@ -2,6 +2,7 @@ package com.unmiss.app.data
 
 import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.data.remote.ReminderDto
+import com.unmiss.app.data.remote.CategoryWeightsDto
 import com.unmiss.app.data.remote.SnoozeReminderRequest
 import com.unmiss.app.data.remote.UnmissApi
 import retrofit2.HttpException
@@ -20,6 +21,14 @@ class ReminderRepository(private val container: AppContainer) {
     }
 
     suspend fun analysisRuns() = authenticatedCall { api -> api.analysisRuns() }
+
+    suspend fun qualityStats() = authenticatedCall { api -> api.qualityStats() }
+
+    suspend fun categoryWeights() = authenticatedCall { api -> api.categoryWeights() }
+
+    suspend fun updateCategoryWeights(weights: Map<String, Int>) = authenticatedCall { api ->
+        api.updateCategoryWeights(CategoryWeightsDto.fromMap(weights))
+    }
 
     suspend fun done(id: String) = authenticatedCall { api ->
         api.completeReminder(id)
@@ -73,6 +82,7 @@ private fun ReminderDto.toLocal(displayedAt: Long?): LocalReminder = LocalRemind
     reason = reason,
     importance = importance,
     quadrant = quadrant,
+    category = category,
     status = status,
     remindAt = remindAt,
     displayedAt = displayedAt,

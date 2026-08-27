@@ -3,6 +3,7 @@ import { JwtService } from '@nestjs/jwt'
 import { DevicesRepository, type DeviceRow } from './devices.repository'
 import type { RegisterDeviceDto } from './dto/register-device.dto'
 import type { UpdateAnalysisScheduleDto } from './dto/update-analysis-schedule.dto'
+import type { UpdateCategoryWeightsDto } from './dto/update-category-weights.dto'
 
 export interface RegisterDeviceResult {
   token: string
@@ -63,6 +64,14 @@ export class DevicesService {
       dto.times,
       dto.timezone,
     )
+  }
+
+  categoryWeights(userId: string) {
+    return this.devicesRepository.categoryWeights(userId)
+  }
+
+  updateCategoryWeights(userId: string, dto: UpdateCategoryWeightsDto) {
+    return this.devicesRepository.updateCategoryWeights(userId, dto)
   }
 
   async deleteUserData(userId: string): Promise<void> {

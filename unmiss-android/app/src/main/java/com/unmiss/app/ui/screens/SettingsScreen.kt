@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -17,9 +18,11 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Schedule
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
@@ -71,6 +74,9 @@ fun SettingsScreen(onBack: () -> Unit) {
     var analysisTimes by remember { mutableStateOf(listOf("22:00")) }
     var scheduleMessage by remember { mutableStateOf<String?>(null) }
     var scheduleSaving by remember { mutableStateOf(false) }
+    var categoryWeights by remember { mutableStateOf(DEFAULT_CATEGORY_WEIGHTS) }
+    var categoryMessage by remember { mutableStateOf<String?>(null) }
+    var categorySaveJob by remember { mutableStateOf<kotlinx.coroutines.Job?>(null) }
 
     fun saveAnalysisTimes(updated: List<String>) {
         val normalized = updated.distinct().sorted()
@@ -111,6 +117,26 @@ fun SettingsScreen(onBack: () -> Unit) {
         ).show()
     }
 
+    fun saveCategoryWeight(category: String, weight: Int) {
+        val updated = categoryWeights + (category to weight.coerceIn(0, 5))
+        categoryWeights = updated
+        categoryMessage = if (weight == 0) "0 星类别将不再生成新的候选事项" else "正在保存偏好…"
+        categorySaveJob?.cancel()
+        categorySaveJob = scope.launch {
+            settings.setCategoryWeights(updated)
+            delay(350)
+            runCatching {
+                ServiceLocator.get().reminderRepository.updateCategoryWeights(updated)
+            }.onSuccess { remote ->
+                categoryWeights = remote.asMap()
+                settings.setCategoryWeights(categoryWeights)
+                categoryMessage = "已同步；偏好只影响未来候选，不会取消已确认提醒"
+            }.onFailure {
+                categoryMessage = "已保存在本机，但同步失败；请检查网络"
+            }
+        }
+    }
+
     LaunchedEffect(Unit) {
         baseUrl = settings.baseUrlOnce()
         captureEnabled = settings.captureEnabledOnce()
@@ -118,10 +144,16 @@ fun SettingsScreen(onBack: () -> Unit) {
         liquidGlassIntensity = settings.liquidGlassIntensityOnce()
         liquidGlassIntensityLoaded = true
         analysisTimes = settings.analysisTimesOnce().sorted()
+        categoryWeights = settings.categoryWeightsOnce()
         runCatching { ServiceLocator.get().notificationRepository.analysisSchedule() }
             .onSuccess { remote ->
                 analysisTimes = remote.times.sorted()
                 settings.setAnalysisTimes(remote.times.toSet())
+            }
+        runCatching { ServiceLocator.get().reminderRepository.categoryWeights() }
+            .onSuccess { remote ->
+                categoryWeights = remote.asMap()
+                settings.setCategoryWeights(categoryWeights)
             }
     }
 
@@ -182,6 +214,66 @@ fun SettingsScreen(onBack: () -> Unit) {
                             scope.launch { settings.setCaptureEnabled(enabled) }
                         },
                     )
+                }
+            }
+
+            AdaptiveGlassSurface(
+                modifier = Modifier.fillMaxWidth().animateContentSize(),
+                shape = RoundedCornerShape(24.dp),
+                color = Color.White.copy(alpha = 0.86f),
+            ) {
+                Column(
+                    modifier = Modifier.padding(18.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Text("提醒偏好", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        "星级只调整未来候选的关注顺序；0 星不再生成该类别的新候选。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    CATEGORY_OPTIONS.forEach { option ->
+                        val weight = categoryWeights[option.id] ?: 3
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(option.label, style = MaterialTheme.typography.bodyMedium)
+                                if (weight == 0) {
+                                    Text(
+                                        "已关闭",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.error,
+                                    )
+                                }
+                            }
+                            (1..5).forEach { star ->
+                                IconButton(
+                                    modifier = Modifier.size(36.dp),
+                                    onClick = {
+                                        val next = if (star == 1 && weight == 1) 0 else star
+                                        saveCategoryWeight(option.id, next)
+                                    },
+                                ) {
+                                    Icon(
+                                        Icons.Default.Star,
+                                        contentDescription = "${option.label} $star 星",
+                                        modifier = Modifier.size(22.dp),
+                                        tint = if (star <= weight) MaterialTheme.colorScheme.primary
+                                        else MaterialTheme.colorScheme.outlineVariant,
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    categoryMessage?.let {
+                        Text(
+                            it,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
 
@@ -405,3 +497,17 @@ private fun analysisWindowLabel(times: List<String>, index: Int): String {
     val overnight = if (previous > current) " · 跨夜" else ""
     return "$previous → $current$overnight"
 }
+
+private data class CategoryOption(val id: String, val label: String)
+
+private val CATEGORY_OPTIONS = listOf(
+    CategoryOption("work", "工作"),
+    CategoryOption("life", "生活"),
+    CategoryOption("finance", "财务"),
+    CategoryOption("health", "健康"),
+    CategoryOption("social", "社交"),
+    CategoryOption("entertainment", "娱乐"),
+    CategoryOption("other", "其他"),
+)
+
+private val DEFAULT_CATEGORY_WEIGHTS = CATEGORY_OPTIONS.associate { it.id to 3 }
