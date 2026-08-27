@@ -1,6 +1,7 @@
 package com.unmiss.app.ui.screens
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,26 +16,29 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -47,11 +51,16 @@ import com.unmiss.app.data.db.LocalReminder
 import com.unmiss.app.data.remote.AnalysisRunDto
 import com.unmiss.app.data.remote.QualityStatsDto
 import com.unmiss.app.reminder.ReminderDisplayWorker
-import com.unmiss.app.ui.theme.AdaptiveGlassSurface
+import com.unmiss.app.ui.components.LiquidFilterSheet
+import com.unmiss.app.ui.theme.LiquidChip
+import com.unmiss.app.ui.theme.LiquidIconButton
+import com.unmiss.app.ui.theme.LiquidTextField
+import com.unmiss.app.ui.theme.LiquidButton
 import com.unmiss.app.ui.theme.AdaptiveLiquidButton
 import com.unmiss.app.ui.theme.GlassButtonStyle
 import androidx.compose.ui.platform.LocalContext
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.coroutineScope
 import java.time.Instant
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
@@ -79,15 +88,19 @@ fun RemindersScreen() {
     var qualityStats by remember { mutableStateOf<QualityStatsDto?>(null) }
     var categoryWeights by remember { mutableStateOf<Map<String, Int>>(emptyMap()) }
 
-    suspend fun refresh() {
-        repository.sync()
-        analysisRuns = repository.analysisRuns()
-        qualityStats = repository.qualityStats()
-        categoryWeights = repository.categoryWeights().asMap()
+    suspend fun refresh(): Boolean {
+        var succeeded = false
+        coroutineScope {
+            launch { runCatching { repository.sync() }.onSuccess { succeeded = true } }
+            launch { runCatching { repository.analysisRuns() }.onSuccess { analysisRuns = it; succeeded = true } }
+            launch { runCatching { repository.qualityStats() }.onSuccess { qualityStats = it; succeeded = true } }
+            launch { runCatching { repository.categoryWeights() }.onSuccess { categoryWeights = it.asMap(); succeeded = true } }
+        }
+        return succeeded
     }
 
     LaunchedEffect(Unit) {
-        runCatching { refresh() }.onFailure { error = "同步失败，请检查网络" }
+        if (!refresh()) error = "同步失败，请检查网络"
     }
 
     fun runAction(action: suspend () -> Unit) {
@@ -100,25 +113,21 @@ fun RemindersScreen() {
     Scaffold(
         containerColor = Color.Transparent,
         contentColor = MaterialTheme.colorScheme.onBackground,
-        topBar = {
-            AdaptiveGlassSurface(
-                modifier = Modifier.fillMaxWidth(),
-                shape = androidx.compose.foundation.shape.RoundedCornerShape(
-                    bottomStart = 24.dp,
-                    bottomEnd = 24.dp,
-                ),
-                color = MaterialTheme.colorScheme.background.copy(alpha = 0.9f),
-            ) {
-                TopAppBar(
-                    title = { Text("遗漏事项") },
-                    colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                )
-            }
-        },
     ) { padding ->
         Column(
-            modifier = Modifier.fillMaxSize().padding(padding).padding(horizontal = 20.dp),
+            modifier = Modifier.fillMaxSize().padding(padding).statusBarsPadding().padding(horizontal = 20.dp),
         ) {
+            Column(
+                modifier = Modifier.padding(top = 20.dp, bottom = 8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
+            ) {
+                Text("提醒", style = MaterialTheme.typography.displaySmall, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold)
+                Text(
+                    "${reminders.count { it.status == "candidate" || it.status == "pending" }} 项待处理 · 候选与已确认提醒",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
             ReminderToolbar(
                 view = view,
                 syncing = syncing,
@@ -127,8 +136,7 @@ fun RemindersScreen() {
                     scope.launch {
                         syncing = true
                         error = null
-                        runCatching { refresh() }
-                            .onFailure { error = "同步失败，请检查服务端地址和网络" }
+                        if (!refresh()) error = "同步失败，请检查服务端地址和网络"
                         syncing = false
                     }
                 },
@@ -136,6 +144,7 @@ fun RemindersScreen() {
             error?.let {
                 Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(bottom = 8.dp))
             }
+            Box(modifier = Modifier.weight(1f)) {
             when (view) {
                 ReminderView.DIGESTS -> AnalysisRunList(analysisRuns)
                 ReminderView.QUALITY -> QualityReport(qualityStats)
@@ -166,6 +175,7 @@ fun RemindersScreen() {
                     onIgnore = { reminder -> runAction { repository.ignore(reminder.id) } },
                 )
             }
+            }
         }
     }
 }
@@ -178,36 +188,38 @@ private fun ReminderToolbar(
     onRefresh: () -> Unit,
 ) {
     Row(
-        modifier = Modifier.fillMaxWidth().padding(top = 12.dp, bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Row(
-            modifier = Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            FilterChip(
-                selected = view == ReminderView.ITEMS,
-                onClick = { onViewChange(ReminderView.ITEMS) },
-                label = { Text("事项") },
-            )
-            FilterChip(
-                selected = view == ReminderView.DIGESTS,
-                onClick = { onViewChange(ReminderView.DIGESTS) },
-                label = { Text("归纳记录") },
-            )
-            FilterChip(
-                selected = view == ReminderView.QUALITY,
-                onClick = { onViewChange(ReminderView.QUALITY) },
-                label = { Text("统计") },
-            )
+        Row(modifier = Modifier.weight(1f)) {
+            listOf(
+                ReminderView.ITEMS to "事项",
+                ReminderView.DIGESTS to "归纳",
+                ReminderView.QUALITY to "统计",
+            ).forEach { (item, label) ->
+                Column(
+                    modifier = Modifier.clickable { onViewChange(item) }.padding(horizontal = 12.dp, vertical = 8.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Text(
+                        label,
+                        fontWeight = if (view == item) androidx.compose.ui.text.font.FontWeight.SemiBold
+                        else androidx.compose.ui.text.font.FontWeight.Normal,
+                        color = if (view == item) MaterialTheme.colorScheme.primary
+                        else MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                    Spacer(Modifier.height(2.dp))
+                    Box(
+                        modifier = Modifier.width(22.dp).height(2.dp).background(
+                            if (view == item) MaterialTheme.colorScheme.primary else Color.Transparent,
+                            androidx.compose.foundation.shape.RoundedCornerShape(2.dp),
+                        ),
+                    )
+                }
+            }
         }
-        Spacer(Modifier.width(8.dp))
-        AdaptiveLiquidButton(
-            enabled = !syncing,
-            style = GlassButtonStyle.SECONDARY,
-            onClick = onRefresh,
-        ) { Text(if (syncing) "同步中" else "刷新") }
+        LiquidButton(enabled = !syncing, onClick = onRefresh, style = GlassButtonStyle.SECONDARY) { Text(if (syncing) "同步中" else "刷新") }
     }
 }
 
@@ -228,6 +240,8 @@ private fun ReminderHistory(
     onSnooze: (LocalReminder) -> Unit,
     onIgnore: (LocalReminder) -> Unit,
 ) {
+    var showFilters by remember { mutableStateOf(false) }
+    var visibleLimit by remember { mutableIntStateOf(40) }
     val filtered = remember(reminders, query, statusFilter, quadrantFilter, categoryFilter, categoryWeights) {
         reminders.filter { reminder ->
             val statusMatches = when (statusFilter) {
@@ -246,73 +260,70 @@ private fun ReminderHistory(
                 (categoryFilter == null || reminder.category == categoryFilter)
         }.sortedByDescending { reminder -> categoryWeights[reminder.category] ?: 3 }
     }
+    LaunchedEffect(query, statusFilter, quadrantFilter, categoryFilter) { visibleLimit = 40 }
+    val visible = filtered.take(visibleLimit)
+    val activeFilterCount = listOf(
+        statusFilter != ReminderStatusFilter.ACTIVE,
+        quadrantFilter != null,
+        categoryFilter != null,
+    ).count { it }
 
-    OutlinedTextField(
+    Column(modifier = Modifier.fillMaxSize()) {
+    LiquidTextField(
         value = query,
         onValueChange = onQueryChange,
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
-        placeholder = { Text("搜索提醒标题、内容或归纳原因") },
-        leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        placeholder = "搜索事项",
+        leading = { Icon(Icons.Filled.Search, contentDescription = null) },
+        trailing = {
+            Box {
+                LiquidIconButton(onClick = { showFilters = true }) {
+                    Icon(Icons.Filled.FilterList, contentDescription = "筛选")
+                }
+                if (activeFilterCount > 0) {
+                    Text(
+                        activeFilterCount.toString(),
+                        modifier = Modifier.align(Alignment.TopEnd)
+                            .background(MaterialTheme.colorScheme.primary, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
+                            .padding(horizontal = 4.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onPrimary,
+                    )
+                }
+            }
+        },
         singleLine = true,
     )
     Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically,
     ) {
-        ReminderStatusFilter.entries.forEach { filter ->
-            FilterChip(
-                selected = statusFilter == filter,
-                onClick = { onStatusChange(filter) },
-                label = { Text(filter.label) },
-            )
-        }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(
-            selected = categoryFilter == null,
-            onClick = { onCategoryChange(null) },
-            label = { Text("全部类别") },
+        Text(
+            "${filtered.size} 项${reminderFilterSummary(statusFilter, categoryFilter, quadrantFilter)}",
+            style = MaterialTheme.typography.labelMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
-        REMINDER_CATEGORIES.forEach { category ->
-            FilterChip(
-                selected = categoryFilter == category.first,
-                onClick = { onCategoryChange(category.first) },
-                label = { Text(category.second) },
-            )
-        }
-    }
-    Row(
-        modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        FilterChip(
-            selected = quadrantFilter == null,
-            onClick = { onQuadrantChange(null) },
-            label = { Text("全部象限") },
-        )
-        QUADRANTS.forEach { quadrant ->
-            FilterChip(
-                selected = quadrantFilter == quadrant.id,
-                onClick = { onQuadrantChange(quadrant.id) },
-                label = { Text(quadrant.shortLabel) },
-            )
+        if (activeFilterCount > 0) {
+            LiquidButton(onClick = {
+                onStatusChange(ReminderStatusFilter.ACTIVE)
+                onCategoryChange(null)
+                onQuadrantChange(null)
+            }, style = GlassButtonStyle.SECONDARY) { Text("清除") }
         }
     }
 
     if (filtered.isEmpty()) {
-        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+        Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
             Text("没有符合筛选条件的提醒", color = MaterialTheme.colorScheme.onSurfaceVariant)
         }
     } else {
         LazyColumn(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.fillMaxWidth().weight(1f),
             contentPadding = PaddingValues(top = 8.dp, bottom = 116.dp),
         ) {
             QUADRANTS.forEach { quadrant ->
-                val group = filtered.filter { it.quadrant == quadrant.id }
+                val group = visible.filter { it.quadrant == quadrant.id }
                 if (group.isNotEmpty()) {
                     item(key = "header-${quadrant.id}") {
                         Text(
@@ -335,8 +346,93 @@ private fun ReminderHistory(
                     }
                 }
             }
+            if (visible.size < filtered.size) {
+                item {
+                    LiquidButton(
+                        onClick = { visibleLimit += 40 },
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                        style = GlassButtonStyle.SECONDARY,
+                    ) { Text("继续加载 · ${filtered.size - visible.size} 项") }
+                }
+            }
         }
     }
+    }
+
+    if (showFilters) {
+        ReminderFilterSheet(
+            status = statusFilter,
+            category = categoryFilter,
+            quadrant = quadrantFilter,
+            onStatusChange = onStatusChange,
+            onCategoryChange = onCategoryChange,
+            onQuadrantChange = onQuadrantChange,
+            onDismiss = { showFilters = false },
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun ReminderFilterSheet(
+    status: ReminderStatusFilter,
+    category: String?,
+    quadrant: String?,
+    onStatusChange: (ReminderStatusFilter) -> Unit,
+    onCategoryChange: (String?) -> Unit,
+    onQuadrantChange: (String?) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    LiquidFilterSheet(onDismissRequest = onDismiss) {
+        Column(
+            modifier = Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, bottom = 28.dp),
+            verticalArrangement = Arrangement.spacedBy(18.dp),
+        ) {
+            Text("筛选事项", style = MaterialTheme.typography.headlineSmall, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold)
+            Text("状态", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                ReminderStatusFilter.entries.forEach { item ->
+                    LiquidChip(selected = status == item, onClick = { onStatusChange(item) }, label = { Text(item.label) })
+                }
+            }
+            Text("类别", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LiquidChip(selected = category == null, onClick = { onCategoryChange(null) }, label = { Text("全部") })
+                REMINDER_CATEGORIES.forEach { item ->
+                    LiquidChip(selected = category == item.first, onClick = { onCategoryChange(item.first) }, label = { Text(item.second) })
+                }
+            }
+            Text("优先级", style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            Row(
+                modifier = Modifier.horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                LiquidChip(selected = quadrant == null, onClick = { onQuadrantChange(null) }, label = { Text("全部") })
+                QUADRANTS.forEach { item ->
+                    LiquidChip(selected = quadrant == item.id, onClick = { onQuadrantChange(item.id) }, label = { Text(item.shortLabel) })
+                }
+            }
+            LiquidButton(onClick = onDismiss, modifier = Modifier.fillMaxWidth()) { Text("完成") }
+        }
+    }
+}
+
+private fun reminderFilterSummary(
+    status: ReminderStatusFilter,
+    category: String?,
+    quadrant: String?,
+): String {
+    val parts = mutableListOf<String>()
+    if (status != ReminderStatusFilter.ACTIVE) parts += status.label
+    category?.let { parts += categoryLabel(it) }
+    quadrant?.let { id -> parts += QUADRANTS.firstOrNull { it.id == id }?.shortLabel ?: id }
+    return if (parts.isEmpty()) "" else " · ${parts.joinToString(" · ")}"
 }
 
 @Composable
@@ -392,7 +488,7 @@ private fun QualityReport(stats: QualityStatsDto?) {
             }
         }
         item {
-            AdaptiveGlassSurface(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                 color = Color.White.copy(alpha = 0.30f),
@@ -416,7 +512,7 @@ private fun QualityReport(stats: QualityStatsDto?) {
             }
         }
         item {
-            AdaptiveGlassSurface(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                 color = Color.White.copy(alpha = 0.30f),
@@ -443,7 +539,7 @@ private fun QualityReport(stats: QualityStatsDto?) {
         }
         if (stats.quadrants.isNotEmpty()) {
             item {
-                AdaptiveGlassSurface(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                     color = Color.White.copy(alpha = 0.30f),
@@ -482,7 +578,7 @@ private fun QualityReport(stats: QualityStatsDto?) {
         }
         if (stats.packages.isNotEmpty()) {
             item {
-                AdaptiveGlassSurface(
+                Surface(
                     modifier = Modifier.fillMaxWidth(),
                     shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
                     color = Color.White.copy(alpha = 0.30f),
@@ -527,7 +623,7 @@ private fun QualityMetric(
     note: String,
     color: Color,
 ) {
-    AdaptiveGlassSurface(
+    Surface(
         modifier = modifier,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(22.dp),
         color = Color.White.copy(alpha = 0.30f),
@@ -579,7 +675,7 @@ private fun AnalysisRunList(runs: List<AnalysisRunDto>) {
                 "failed" -> "归纳失败"
                 else -> "归纳中"
             }
-            AdaptiveGlassSurface(
+            Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
                 color = Color.White.copy(alpha = 0.30f),
@@ -647,11 +743,7 @@ private fun ReminderItem(
     onSnooze: () -> Unit,
     onIgnore: () -> Unit,
 ) {
-    AdaptiveGlassSurface(
-        modifier = modifier.fillMaxWidth(),
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(20.dp),
-        color = Color.White.copy(alpha = 0.30f),
-    ) {
+    Column(modifier = modifier.fillMaxWidth()) {
       Row(modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
         Box(
             modifier = Modifier
@@ -717,11 +809,15 @@ private fun ReminderItem(
                 AdaptiveLiquidButton(onClick = onDone) { Text("已完成") }
                 AdaptiveLiquidButton(onClick = onSnooze, style = GlassButtonStyle.SECONDARY) { Text("一小时后") }
             }
-            TextButton(onClick = onIgnore) { Text("忽略") }
+            LiquidButton(onClick = onIgnore, style = GlassButtonStyle.SECONDARY) { Text("忽略") }
           }
         }
         }
       }
+      androidx.compose.material3.HorizontalDivider(
+          modifier = Modifier.padding(start = 20.dp),
+          color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.45f),
+      )
     }
 }
 

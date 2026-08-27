@@ -13,19 +13,20 @@ import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Surface
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.LayerBackdrop
+import com.kyant.backdrop.Backdrop
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
 import com.kyant.backdrop.drawBackdrop
@@ -35,18 +36,21 @@ import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
+import kotlin.math.pow
 
 internal val LocalLiquidBackdrop = staticCompositionLocalOf<LayerBackdrop> {
     error("Liquid glass requires a LayerBackdrop")
 }
 
 val LocalLiquidGlassEnabled = staticCompositionLocalOf { true }
-val LocalLiquidGlassIntensity = staticCompositionLocalOf { 0.65f }
+val LocalLiquidGlassIntensity = staticCompositionLocalOf { 1f }
+
+enum class GlassMaterial { CLEAR, REGULAR, PROMINENT }
 
 @Composable
 fun LiquidGlassCanvas(
     enabled: Boolean = true,
-    intensity: Float = 0.65f,
+    intensity: Float = 1f,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val backdrop = rememberLayerBackdrop()
@@ -62,53 +66,7 @@ fun LiquidGlassCanvas(
                     .fillMaxSize()
                     .layerBackdrop(backdrop),
             ) {
-                drawRect(
-                    brush = Brush.verticalGradient(
-                        listOf(
-                            Color(0xFFF8F9FC),
-                            Color(0xFFF2F4F8),
-                            Color(0xFFF6F7FA),
-                        ),
-                    ),
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color(0x3873B8FF), Color(0x0073B8FF)),
-                        center = Offset(size.width * 1.02f, size.height * 0.06f),
-                        radius = size.minDimension * 0.64f,
-                    ),
-                    radius = size.minDimension * 0.64f,
-                    center = Offset(size.width * 1.02f, size.height * 0.06f),
-                )
-                if (enabled) {
-                    drawCircle(
-                        brush = Brush.radialGradient(
-                            listOf(Color(0x287E8CFF), Color(0x007E8CFF)),
-                            center = Offset(size.width * 0.48f, size.height * 0.38f),
-                            radius = size.minDimension * 0.42f,
-                        ),
-                        radius = size.minDimension * 0.42f,
-                        center = Offset(size.width * 0.48f, size.height * 0.38f),
-                    )
-                }
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color(0x2E7CDCC8), Color(0x007CDCC8)),
-                        center = Offset(size.width * -0.12f, size.height * 0.72f),
-                        radius = size.minDimension * 0.52f,
-                    ),
-                    radius = size.minDimension * 0.52f,
-                    center = Offset(size.width * -0.12f, size.height * 0.72f),
-                )
-                drawCircle(
-                    brush = Brush.radialGradient(
-                        listOf(Color(0x24FFB38A), Color(0x00FFB38A)),
-                        center = Offset(size.width * 0.90f, size.height * 0.96f),
-                        radius = size.minDimension * 0.38f,
-                    ),
-                    radius = size.minDimension * 0.38f,
-                    center = Offset(size.width * 0.90f, size.height * 0.96f),
-                )
+                drawRect(Color(0xFFF2F3F7))
             }
             content()
         }
@@ -122,14 +80,52 @@ fun LiquidGlass(
     glassShape: Shape? = null,
     panel: Boolean = false,
     navigation: Boolean = false,
-    surfaceAlpha: Float = 0.52f,
+    material: GlassMaterial = if (navigation) GlassMaterial.PROMINENT else if (panel) GlassMaterial.REGULAR else GlassMaterial.CLEAR,
+    surfaceAlpha: Float? = null,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
     val shape = glassShape ?: RoundedCornerShape(cornerRadius.dp)
     val backdrop = LocalLiquidBackdrop.current
     val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
-    val navigationResponse = if (intensity == 0f) 0f else 0.35f + intensity * 0.65f
+    if (!LocalLiquidGlassEnabled.current || intensity <= 0f) {
+        if (onClick != null) {
+            Surface(
+                modifier = modifier,
+                shape = shape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+                onClick = onClick,
+            ) { Box(content = content) }
+        } else {
+            Surface(
+                modifier = modifier,
+                shape = shape,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
+            ) { Box(content = content) }
+        }
+        return
+    }
+    val materialResponse = intensity.pow(0.82f)
+    val blurRadius = when (material) {
+        GlassMaterial.CLEAR -> 2f
+        GlassMaterial.REGULAR -> 8f
+        GlassMaterial.PROMINENT -> 8f
+    }
+    val refractionHeight = when (material) {
+        GlassMaterial.CLEAR -> 12f
+        GlassMaterial.REGULAR -> 18f
+        GlassMaterial.PROMINENT -> 24f
+    }
+    val refractionAmount = when (material) {
+        GlassMaterial.CLEAR -> 22f
+        GlassMaterial.REGULAR -> 24f
+        GlassMaterial.PROMINENT -> 24f
+    }
+    val resolvedSurfaceAlpha = surfaceAlpha ?: when (material) {
+        GlassMaterial.CLEAR -> 0.18f
+        GlassMaterial.REGULAR -> 0.32f
+        GlassMaterial.PROMINENT -> 0.40f
+    }
     val enhanced = LocalLiquidGlassEnabled.current && intensity > 0f
     val interaction = remember { MutableInteractionSource() }
     val pressed by interaction.collectIsPressedAsState()
@@ -160,42 +156,40 @@ fun LiquidGlass(
                 effects = {
                     if (intensity > 0f) {
                         if (!navigation) vibrancy()
-                        blur((if (navigation) 36.dp.toPx() * navigationResponse else (if (panel) 10.dp else 8.dp).toPx() * intensity))
-                        if (!navigation) {
-                            lens(
-                                refractionHeight = (if (panel) 7.dp else 18.dp).toPx() * intensity,
-                                refractionAmount = (if (panel) 10.dp else 24.dp).toPx() * intensity,
-                                chromaticAberration = !panel && intensity >= 0.35f,
-                            )
-                        }
+                        blur(blurRadius.dp.toPx() * materialResponse)
+                        lens(
+                            refractionHeight = refractionHeight.dp.toPx() * materialResponse,
+                            refractionAmount = refractionAmount.dp.toPx() * materialResponse,
+                            chromaticAberration = material == GlassMaterial.PROMINENT && intensity >= 0.65f,
+                        )
                     }
                 },
                 highlight = if (enhanced) {
-                    { Highlight.Default.copy(alpha = 0.52f * intensity) }
+                    { Highlight.Default.copy(alpha = (if (material == GlassMaterial.CLEAR) 0.56f else 0.72f) * materialResponse) }
                 } else null,
                 shadow = if (enhanced) {
                   {
-                    Shadow(radius = 10.dp, color = Color.Black.copy(alpha = 0.07f * intensity))
+                    Shadow(radius = if (material == GlassMaterial.PROMINENT) 12.dp else 7.dp, color = Color.Black.copy(alpha = 0.08f * materialResponse))
                   }
                 } else null,
                 innerShadow = if (enhanced) {
-                    { InnerShadow(radius = 7.dp, alpha = 0.3f * intensity) }
+                    { InnerShadow(radius = 7.dp, alpha = 0.34f * materialResponse) }
                 } else null,
                 onDrawSurface = {
-                    drawRect(Color.White.copy(alpha = surfaceAlpha.coerceIn(0f, 1f) * intensity))
+                    drawRect(Color.White.copy(alpha = resolvedSurfaceAlpha.coerceIn(0f, 1f) * materialResponse))
                 },
             )
             .background(
-                color = Color.White.copy(alpha = if (navigation) 0.18f * intensity else 0f),
+                color = Color.Transparent,
                 shape = shape,
             )
             .border(
-                width = 1.dp,
+                width = 0.8.dp,
                 brush = Brush.linearGradient(
                     listOf(
-                        Color.White.copy(alpha = 0.96f * intensity),
-                        Color.White.copy(alpha = 0.42f * intensity),
-                        Color(0xFF5C84B7).copy(alpha = 0.16f * intensity),
+                        Color.White.copy(alpha = 0.9f * materialResponse),
+                        Color.White.copy(alpha = 0.3f * materialResponse),
+                        Color.Black.copy(alpha = 0.08f * materialResponse),
                     ),
                 ),
                 shape = shape,
@@ -210,6 +204,7 @@ fun AdaptiveGlassSurface(
     modifier: Modifier = Modifier,
     shape: Shape = RoundedCornerShape(24.dp),
     color: Color = Color.White.copy(alpha = 0.86f),
+    material: GlassMaterial = GlassMaterial.REGULAR,
     onClick: (() -> Unit)? = null,
     content: @Composable BoxScope.() -> Unit,
 ) {
@@ -218,6 +213,7 @@ fun AdaptiveGlassSurface(
             modifier = modifier,
             glassShape = shape,
             panel = true,
+            material = material,
             onClick = onClick,
             content = content,
         )
@@ -243,43 +239,41 @@ fun AdaptiveGlassSurface(
 fun Modifier.liquidNavigationIndicator(
     tint: Color,
     dragging: Boolean,
+    backdrop: Backdrop = LocalLiquidBackdrop.current,
 ): Modifier {
-    val backdrop = LocalLiquidBackdrop.current
     val intensity = LocalLiquidGlassIntensity.current.coerceIn(0f, 1f)
-    val navigationResponse = if (intensity == 0f) 0f else 0.35f + intensity * 0.65f
+    val navigationResponse = if (intensity == 0f) 0f else 0.4f + intensity * 0.9f
     val shape = RoundedCornerShape(28.dp)
     return drawBackdrop(
         backdrop = backdrop,
         shape = { shape },
         effects = {
             if (intensity > 0f) {
-                blur((if (dragging) 10.dp else 28.dp).toPx() * navigationResponse)
-                if (dragging) {
-                    lens(
-                        refractionHeight = 7.dp.toPx() * intensity,
-                        refractionAmount = 10.dp.toPx() * intensity,
-                        chromaticAberration = intensity >= 0.6f,
-                    )
-                }
+                blur((if (dragging) 7.dp else 12.dp).toPx() * navigationResponse)
+                lens(
+                    refractionHeight = (if (dragging) 13.dp else 9.dp).toPx() * navigationResponse,
+                    refractionAmount = (if (dragging) 22.dp else 16.dp).toPx() * navigationResponse,
+                    chromaticAberration = intensity >= 0.58f,
+                )
             }
         },
-        highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.9f else 0.68f) * intensity) },
+        highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.98f else 0.82f) * intensity) },
         shadow = {
             Shadow(
                 radius = if (dragging) 12.dp else 7.dp,
-                color = Color.Black.copy(alpha = (if (dragging) 0.12f else 0.07f) * intensity),
+                color = Color.Black.copy(alpha = (if (dragging) 0.15f else 0.10f) * intensity),
             )
         },
         innerShadow = {
-            InnerShadow(radius = 6.dp, alpha = (if (dragging) 0.48f else 0.32f) * intensity)
+            InnerShadow(radius = 7.dp, alpha = (if (dragging) 0.56f else 0.42f) * intensity)
         },
         onDrawSurface = {
-            drawRect(Color.White.copy(alpha = 0.22f * intensity))
-            drawRect(tint.copy(alpha = (if (dragging) 0.13f else 0.08f) * intensity))
+            drawRect(Color.White.copy(alpha = 0.18f * intensity))
+            drawRect(tint.copy(alpha = (if (dragging) 0.20f else 0.14f) * intensity))
         },
     ).border(
-        width = 0.8.dp,
-        color = Color.White.copy(alpha = 0.7f * intensity),
+        width = 1.1.dp,
+        color = Color.White.copy(alpha = 0.9f * intensity),
         shape = shape,
     )
 }

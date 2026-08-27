@@ -41,6 +41,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -49,25 +50,33 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.backdrops.layerBackdrop
 import com.kyant.backdrop.backdrops.rememberLayerBackdrop
+import com.kyant.backdrop.backdrops.rememberCombinedBackdrop
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.semantics.clearAndSetSemantics
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import com.unmiss.app.data.ServiceLocator
+import com.unmiss.app.data.AppCatalog
 import com.unmiss.app.ui.screens.AllowlistScreen
 import com.unmiss.app.ui.screens.HomeScreen
 import com.unmiss.app.ui.screens.NotificationHistoryScreen
 import com.unmiss.app.ui.screens.RemindersScreen
-import com.unmiss.app.ui.screens.SettingsScreen
+import com.unmiss.app.ui.screens.SettingsHubScreen
+import com.unmiss.app.ui.screens.StatisticsScreen
 import com.unmiss.app.ui.theme.LiquidGlass
 import com.unmiss.app.ui.theme.LiquidGlassCanvas
 import com.unmiss.app.ui.theme.LocalLiquidGlassEnabled
+import com.unmiss.app.ui.theme.LocalLiquidGlassIntensity
 import com.unmiss.app.ui.theme.LocalLiquidBackdrop
 import com.unmiss.app.ui.theme.liquidNavigationIndicator
+import com.unmiss.app.ui.theme.LiquidOverlayHost
 import com.unmiss.app.upload.UploadWorker
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
+import kotlin.math.abs
 
 object Routes {
     const val HOME = "home"
@@ -75,6 +84,7 @@ object Routes {
     const val HISTORY = "history"
     const val REMINDERS = "reminders"
     const val SETTINGS = "settings"
+    const val STATISTICS = "statistics"
 }
 
 private data class BottomNavItem(val route: String, val label: String, val icon: ImageVector)
@@ -84,7 +94,7 @@ fun UnmissNavHost() {
     val liquidGlassEnabled by ServiceLocator.get().settingsDataStore.liquidGlassEnabled
         .collectAsState(initial = true)
     val liquidGlassIntensity by ServiceLocator.get().settingsDataStore.liquidGlassIntensity
-        .collectAsState(initial = 0.65f)
+        .collectAsState(initial = 1f)
     val navController = rememberNavController()
     val navigationBackdrop = rememberLayerBackdrop()
     val items = listOf(
@@ -105,7 +115,8 @@ fun UnmissNavHost() {
     }
 
     LaunchedEffect(Unit) {
-        runCatching { ServiceLocator.get().notificationRepository.ensureRegistered() }
+        launch { runCatching { AppCatalog(navController.context).loadUserVisibleApps() } }
+        launch { runCatching { ServiceLocator.get().notificationRepository.ensureRegistered() } }
         UploadWorker.enqueueNow(navController.context)
     }
 
@@ -113,7 +124,7 @@ fun UnmissNavHost() {
         enabled = liquidGlassEnabled,
         intensity = liquidGlassIntensity,
     ) {
-        Box(modifier = Modifier.fillMaxSize()) {
+        LiquidOverlayHost(backdrop = navigationBackdrop) {
             NavHost(
                 navController = navController,
                 startDestination = Routes.HOME,
@@ -125,14 +136,16 @@ fun UnmissNavHost() {
                         onOpenAllowlist = { navigateTopLevel(Routes.ALLOWLIST) },
                         onOpenReminders = { navigateTopLevel(Routes.REMINDERS) },
                         onOpenHistory = { navigateTopLevel(Routes.HISTORY) },
+                        onOpenStatistics = { navController.navigate(Routes.STATISTICS) },
                     )
                 }
                 composable(Routes.ALLOWLIST) { AllowlistScreen() }
                 composable(Routes.HISTORY) { NotificationHistoryScreen() }
                 composable(Routes.REMINDERS) { RemindersScreen() }
-                composable(Routes.SETTINGS) { SettingsScreen(onBack = { navController.popBackStack() }) }
+                composable(Routes.SETTINGS) { SettingsHubScreen(onClose = { navController.popBackStack() }) }
+                composable(Routes.STATISTICS) { StatisticsScreen(onBack = { navController.popBackStack() }) }
             }
-            if (currentRoute != Routes.SETTINGS) {
+            if (currentRoute != Routes.SETTINGS && currentRoute != Routes.STATISTICS) {
                 Box(modifier = Modifier.align(Alignment.BottomCenter)) {
                     CompositionLocalProvider(LocalLiquidBackdrop provides navigationBackdrop) {
                         LiquidBottomBar(
@@ -153,7 +166,7 @@ private fun LiquidBottomBar(
     currentRoute: String?,
     onSelect: (String) -> Unit,
 ) {
-    if (LocalLiquidGlassEnabled.current) {
+    if (LocalLiquidGlassEnabled.current && LocalLiquidGlassIntensity.current > 0f) {
         DraggableLiquidBottomBar(items, currentRoute, onSelect)
     } else {
         ClassicBottomBar(items, currentRoute, onSelect)
@@ -216,9 +229,12 @@ private fun DraggableLiquidBottomBar(
 ) {
     val selectedIndex = items.indexOfFirst { it.route == currentRoute }.coerceAtLeast(0)
     val position = remember { Animatable(selectedIndex.toFloat()) }
+    val tabsBackdrop = rememberLayerBackdrop()
+    val combinedBackdrop = rememberCombinedBackdrop(LocalLiquidBackdrop.current, tabsBackdrop)
     val scope = rememberCoroutineScope()
     var dragging by remember { mutableStateOf(false) }
     var dragPosition by remember { mutableFloatStateOf(selectedIndex.toFloat()) }
+    var velocityStretch by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(selectedIndex) {
         if (!dragging && position.targetValue != selectedIndex.toFloat()) {
@@ -240,9 +256,9 @@ private fun DraggableLiquidBottomBar(
             modifier = Modifier.fillMaxWidth(),
             cornerRadius = 34,
             navigation = true,
-            surfaceAlpha = 0.48f,
+            surfaceAlpha = 0.28f,
         ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(64.dp)) {
+            BoxWithConstraints(modifier = Modifier.fillMaxWidth().height(66.dp)) {
                 val tabWidthPx = constraints.maxWidth.toFloat() / items.size
                 val tabWidth = with(LocalDensity.current) { tabWidthPx.toDp() }
                 val activeIndex = position.value.roundToInt().coerceIn(items.indices)
@@ -260,6 +276,7 @@ private fun DraggableLiquidBottomBar(
                 fun settle() {
                     val target = dragPosition.roundToInt().coerceIn(items.indices)
                     dragging = false
+                    velocityStretch = 0f
                     dragPosition = target.toFloat()
                     if (items[target].route != currentRoute) onSelect(items[target].route)
                     scope.launch {
@@ -270,26 +287,48 @@ private fun DraggableLiquidBottomBar(
                     }
                 }
 
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(66.dp)
+                        .clearAndSetSemantics {}
+                        .alpha(0f)
+                        .layerBackdrop(tabsBackdrop)
+                        .graphicsLayer(colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)),
+                ) {
+                    items.forEach { item ->
+                        Column(
+                            modifier = Modifier.weight(1f).height(66.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                        ) {
+                            Icon(item.icon, contentDescription = null)
+                            Text(item.label, style = MaterialTheme.typography.labelSmall)
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .width(tabWidth - 8.dp)
-                        .height(56.dp)
+                        .height(54.dp)
                         .graphicsLayer {
                             translationX = position.value * tabWidthPx + 4.dp.toPx()
-                            translationY = 4.dp.toPx()
-                            scaleX = stretchX
-                            scaleY = stretchY
+                            translationY = 6.dp.toPx()
+                            scaleX = stretchX + abs(velocityStretch) * 0.16f
+                            scaleY = stretchY - abs(velocityStretch) * 0.05f
                         }
                         .liquidNavigationIndicator(
                             tint = MaterialTheme.colorScheme.primary,
                             dragging = dragging,
+                            backdrop = combinedBackdrop,
                         ),
                 )
 
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(64.dp)
+                        .height(66.dp)
                         .pointerInput(tabWidthPx, items.size) {
                             detectHorizontalDragGestures(
                                 onDragStart = {
@@ -301,6 +340,7 @@ private fun DraggableLiquidBottomBar(
                                 onDragEnd = { settle() },
                             ) { change, dragAmount ->
                                 change.consume()
+                                velocityStretch = (dragAmount / tabWidthPx).coerceIn(-1f, 1f)
                                 dragPosition = (dragPosition + dragAmount / tabWidthPx)
                                     .coerceIn(0f, items.lastIndex.toFloat())
                                 scope.launch { position.snapTo(dragPosition) }
@@ -323,7 +363,7 @@ private fun DraggableLiquidBottomBar(
                         Column(
                             modifier = Modifier
                                 .weight(1f)
-                                .height(64.dp)
+                                .height(66.dp)
                                 .clickable(
                                     interactionSource = interactionSource,
                                     indication = null,

@@ -8,7 +8,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -18,6 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
+import android.util.LruCache
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Composable
 fun InstalledAppIcon(
@@ -26,18 +31,24 @@ fun InstalledAppIcon(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
-    val icon = remember(packageName) {
-        runCatching {
-            context.packageManager.getApplicationIcon(packageName)
-                .toBitmap(width = 96, height = 96)
-                .asImageBitmap()
-        }.getOrNull()
+    val icon by produceState<ImageBitmap?>(initialValue = iconCache.get(packageName), packageName) {
+        if (value == null) {
+            value = withContext(Dispatchers.IO) {
+                runCatching {
+                    context.packageManager.getApplicationIcon(packageName)
+                        .toBitmap(width = 96, height = 96)
+                        .asImageBitmap()
+                        .also { iconCache.put(packageName, it) }
+                }.getOrNull()
+            }
+        }
     }
     val shape = RoundedCornerShape(11.dp)
+    val currentIcon = icon
 
-    if (icon != null) {
+    if (currentIcon != null) {
         Image(
-            bitmap = icon,
+            bitmap = currentIcon,
             contentDescription = "$fallbackLabel 图标",
             modifier = modifier.clip(shape),
             contentScale = ContentScale.Fit,
@@ -54,3 +65,5 @@ fun InstalledAppIcon(
         }
     }
 }
+
+private val iconCache = LruCache<String, ImageBitmap>(80)

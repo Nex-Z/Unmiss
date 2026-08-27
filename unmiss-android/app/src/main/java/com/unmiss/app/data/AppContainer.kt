@@ -27,6 +27,7 @@ class AppContainer(context: Context) {
             .addMigrations(UnmissDatabase.MIGRATION_3_4)
             .addMigrations(UnmissDatabase.MIGRATION_4_5)
             .addMigrations(UnmissDatabase.MIGRATION_5_6)
+            .addMigrations(UnmissDatabase.MIGRATION_6_7)
             .fallbackToDestructiveMigration(dropAllTables = true)
             .build()
     }

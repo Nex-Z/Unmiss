@@ -5,6 +5,7 @@ import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
 import androidx.room.Insert
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import androidx.room.Query
 import androidx.room.RoomDatabase
@@ -12,7 +13,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
-@Entity(tableName = "pending_notification_uploads")
+@Entity(
+    tableName = "pending_notification_uploads",
+    indices = [
+        Index(value = ["posted_at"]),
+        Index(value = ["package_name", "posted_at"]),
+        Index(value = ["uploaded_at"]),
+    ],
+)
 data class PendingNotificationUpload(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     @ColumnInfo(name = "notification_key") val notificationKey: String,
@@ -27,7 +35,10 @@ data class PendingNotificationUpload(
     @ColumnInfo(name = "posted_at") val postedAt: Long = createdAt,
 )
 
-@Entity(tableName = "reminders")
+@Entity(
+    tableName = "reminders",
+    indices = [Index(value = ["status", "remind_at"])],
+)
 data class LocalReminder(
     @PrimaryKey val id: String,
     val title: String,
@@ -84,6 +95,7 @@ interface PendingNotificationUploadDao {
                OR COALESCE(title, '') LIKE '%' || :keyword || '%' COLLATE NOCASE
                OR COALESCE(body, '') LIKE '%' || :keyword || '%' COLLATE NOCASE)
         ORDER BY posted_at DESC
+        LIMIT :limit
         """,
     )
     fun observeHistory(
@@ -92,10 +104,36 @@ interface PendingNotificationUploadDao {
         packageName: String?,
         uploadState: String,
         keyword: String,
+        limit: Int,
     ): Flow<List<PendingNotificationUpload>>
+
+    @Query(
+        """
+        SELECT COUNT(*) FROM pending_notification_uploads
+        WHERE (:fromTime IS NULL OR posted_at >= :fromTime)
+          AND (:toTime IS NULL OR posted_at <= :toTime)
+          AND (:packageName IS NULL OR package_name = :packageName)
+          AND (:uploadState = 'all'
+               OR (:uploadState = 'uploaded' AND uploaded_at IS NOT NULL)
+               OR (:uploadState = 'pending' AND uploaded_at IS NULL))
+          AND (:keyword = ''
+               OR COALESCE(title, '') LIKE '%' || :keyword || '%' COLLATE NOCASE
+               OR COALESCE(body, '') LIKE '%' || :keyword || '%' COLLATE NOCASE)
+        """,
+    )
+    fun observeHistoryCount(
+        fromTime: Long?,
+        toTime: Long?,
+        packageName: String?,
+        uploadState: String,
+        keyword: String,
+    ): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM pending_notification_uploads")
     fun observeTotalCount(): Flow<Int>
+
+    @Query("SELECT COUNT(*) FROM pending_notification_uploads WHERE posted_at >= :fromTime")
+    fun observeCountSince(fromTime: Long): Flow<Int>
 
     @Query("SELECT COUNT(*) FROM pending_notification_uploads WHERE uploaded_at IS NULL")
     fun observePendingCount(): Flow<Int>
@@ -139,7 +177,7 @@ interface ReminderDao {
 
 @Database(
     entities = [PendingNotificationUpload::class, LocalReminder::class],
-    version = 6,
+    version = 7,
     exportSchema = false,
 )
 abstract class UnmissDatabase : RoomDatabase() {
@@ -176,6 +214,15 @@ abstract class UnmissDatabase : RoomDatabase() {
         val MIGRATION_5_6 = object : Migration(5, 6) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE reminders ADD COLUMN category TEXT NOT NULL DEFAULT 'other'")
+            }
+        }
+
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_notification_uploads_posted_at ON pending_notification_uploads(posted_at)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_notification_uploads_package_name_posted_at ON pending_notification_uploads(package_name, posted_at)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_pending_notification_uploads_uploaded_at ON pending_notification_uploads(uploaded_at)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_reminders_status_remind_at ON reminders(status, remind_at)")
             }
         }
     }

@@ -132,7 +132,7 @@ class SettingsDataStore(private val context: Context) {
         private val ANALYSIS_TIMES_KEY = stringSetPreferencesKey("analysis_times")
         private val ALLOWLIST_INITIALIZED_KEY = booleanPreferencesKey("allowlist_initialized")
         const val DEFAULT_ANALYSIS_TIME = "22:00"
-        const val DEFAULT_LIQUID_GLASS_INTENSITY = 0.65f
+        const val DEFAULT_LIQUID_GLASS_INTENSITY = 1f
         const val DEFAULT_CATEGORY_WEIGHT = 3
         val CATEGORY_IDS = listOf(
             "work", "life", "finance", "health", "social", "entertainment", "other",

@@ -3,6 +3,8 @@ package com.unmiss.app.data
 import android.content.Context
 import android.content.pm.PackageManager
 import android.os.Build
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 data class InstalledApp(
     val packageName: String,
@@ -11,7 +13,13 @@ data class InstalledApp(
 
 class AppCatalog(private val context: Context) {
 
-    fun loadUserVisibleApps(): List<InstalledApp> {
+    suspend fun loadUserVisibleApps(forceRefresh: Boolean = false): List<InstalledApp> {
+        if (!forceRefresh) cachedApps?.let { return it }
+        return withContext(Dispatchers.Default) { loadAndCache() }
+    }
+
+    private fun loadAndCache(): List<InstalledApp> {
+        cachedApps?.let { return it }
         val pm = context.packageManager
         val launchIntent = android.content.Intent(android.content.Intent.ACTION_MAIN).apply {
             addCategory(android.content.Intent.CATEGORY_LAUNCHER)
@@ -35,9 +43,13 @@ class AppCatalog(private val context: Context) {
             }
             .sortedBy { it.displayName.lowercase() }
             .toList()
+            .also { cachedApps = it }
     }
 
     private companion object {
+        @Volatile
+        var cachedApps: List<InstalledApp>? = null
+
         val EXCLUDED_PACKAGES = setOf(
             "android",
             "com.android.systemui",

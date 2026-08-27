@@ -47,12 +47,38 @@ import androidx.compose.ui.unit.dp
 import com.kyant.backdrop.drawBackdrop
 import com.kyant.backdrop.effects.blur
 import com.kyant.backdrop.effects.lens
+import com.kyant.backdrop.effects.vibrancy
 import com.kyant.backdrop.highlight.Highlight
 import com.kyant.backdrop.shadow.InnerShadow
 import com.kyant.backdrop.shadow.Shadow
 import kotlinx.coroutines.launch
 
 enum class GlassButtonStyle { PRIMARY, SECONDARY, TONAL, DANGER }
+
+@Composable
+fun LiquidButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    style: GlassButtonStyle = GlassButtonStyle.PRIMARY,
+    content: @Composable RowScope.() -> Unit,
+) = AdaptiveLiquidButton(onClick, modifier, enabled, style, content)
+
+@Composable
+fun LiquidIconButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    content: @Composable () -> Unit,
+) = AdaptiveLiquidIconButton(onClick, modifier, enabled, content)
+
+@Composable
+fun LiquidToggle(
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+) = AdaptiveLiquidSwitch(checked, onCheckedChange, modifier, enabled)
 
 @Composable
 fun AdaptiveLiquidButton(
@@ -62,7 +88,7 @@ fun AdaptiveLiquidButton(
     style: GlassButtonStyle = GlassButtonStyle.PRIMARY,
     content: @Composable RowScope.() -> Unit,
 ) {
-    if (!LocalLiquidGlassEnabled.current) {
+    if (!LocalLiquidGlassEnabled.current || LocalLiquidGlassIntensity.current <= 0f) {
         when (style) {
             GlassButtonStyle.PRIMARY -> Button(onClick, modifier, enabled, content = content)
             GlassButtonStyle.SECONDARY -> OutlinedButton(onClick, modifier, enabled, content = content)
@@ -110,22 +136,23 @@ fun AdaptiveLiquidButton(
                     shape = { RoundedCornerShape(23.dp) },
                     effects = {
                         if (intensity > 0f) {
-                            blur((if (pressed) 2.dp else 3.dp).toPx() * intensity)
+                            vibrancy()
+                            blur((if (pressed) 2.dp else 2.5.dp).toPx() * intensity)
                             lens(
-                                (if (pressed) 12.dp else 8.dp).toPx() * intensity,
-                                (if (pressed) 18.dp else 12.dp).toPx() * intensity,
-                                chromaticAberration = pressed && intensity >= 0.35f,
+                                (if (pressed) 15.dp else 11.dp).toPx() * intensity,
+                                (if (pressed) 24.dp else 18.dp).toPx() * intensity,
+                                chromaticAberration = intensity >= 0.62f,
                             )
                         }
                     },
-                    highlight = { Highlight.Default.copy(alpha = (if (pressed) 0.62f else 0.42f) * intensity) },
-                    shadow = { Shadow(radius = 5.dp, color = Color.Black.copy(alpha = 0.045f * intensity)) },
-                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.18f * intensity) },
+                    highlight = { Highlight.Default.copy(alpha = (if (pressed) 0.82f else 0.64f) * intensity) },
+                    shadow = { Shadow(radius = 7.dp, color = Color.Black.copy(alpha = 0.08f * intensity)) },
+                    innerShadow = { InnerShadow(radius = 5.dp, alpha = 0.32f * intensity) },
                     onDrawSurface = {
                         when (style) {
                             GlassButtonStyle.PRIMARY -> drawRect(primary.copy(alpha = 0.56f * intensity))
-                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.16f * intensity))
-                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.12f * intensity))
+                            GlassButtonStyle.SECONDARY -> drawRect(Color.White.copy(alpha = 0.22f * intensity))
+                            GlassButtonStyle.TONAL -> drawRect(primary.copy(alpha = 0.16f * intensity))
                             GlassButtonStyle.DANGER -> drawRect(error.copy(alpha = 0.06f * intensity))
                         }
                     },
@@ -152,7 +179,7 @@ fun AdaptiveLiquidIconButton(
     enabled: Boolean = true,
     content: @Composable () -> Unit,
 ) {
-    if (!LocalLiquidGlassEnabled.current) {
+    if (!LocalLiquidGlassEnabled.current || LocalLiquidGlassIntensity.current <= 0f) {
         IconButton(onClick = onClick, modifier = modifier, enabled = enabled, content = content)
         return
     }
@@ -174,17 +201,19 @@ fun AdaptiveLiquidIconButton(
                 shape = { CircleShape },
                 effects = {
                     if (intensity > 0f) {
-                        blur(2.5.dp.toPx() * intensity)
+                        vibrancy()
+                        blur(2.dp.toPx() * intensity)
                         lens(
-                            7.dp.toPx() * intensity,
                             11.dp.toPx() * intensity,
-                            chromaticAberration = pressed && intensity >= 0.35f,
+                            17.dp.toPx() * intensity,
+                            chromaticAberration = intensity >= 0.62f,
                         )
                     }
                 },
-                highlight = { Highlight.Default.copy(alpha = 0.42f * intensity) },
-                shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.04f * intensity)) },
-                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.14f * intensity)) },
+                highlight = { Highlight.Default.copy(alpha = 0.64f * intensity) },
+                shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.08f * intensity)) },
+                innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.3f * intensity) },
+                onDrawSurface = { drawRect(Color.White.copy(alpha = 0.2f * intensity)) },
             )
             .clickable(
                 interactionSource = interaction,
@@ -204,7 +233,7 @@ fun AdaptiveLiquidSwitch(
     modifier: Modifier = Modifier,
     enabled: Boolean = true,
 ) {
-    if (!LocalLiquidGlassEnabled.current) {
+    if (!LocalLiquidGlassEnabled.current || LocalLiquidGlassIntensity.current <= 0f) {
         Switch(
             checked = checked,
             onCheckedChange = onCheckedChange,
@@ -291,17 +320,18 @@ fun AdaptiveLiquidSwitch(
                     shape = { CircleShape },
                     effects = {
                         if (intensity > 0f) {
-                            blur((if (dragging) 1.5.dp else 2.5.dp).toPx() * intensity)
+                            vibrancy()
+                            blur((if (dragging) 1.5.dp else 2.dp).toPx() * intensity)
                             lens(
-                                (if (dragging) 8.dp else 5.dp).toPx() * intensity,
-                                (if (dragging) 12.dp else 8.dp).toPx() * intensity,
-                                chromaticAberration = dragging && intensity >= 0.35f,
+                                (if (dragging) 11.dp else 8.dp).toPx() * intensity,
+                                (if (dragging) 18.dp else 13.dp).toPx() * intensity,
+                                chromaticAberration = intensity >= 0.62f,
                             )
                         }
                     },
-                    highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.62f else 0.46f) * intensity) },
-                    shadow = { Shadow(radius = 4.dp, color = Color.Black.copy(alpha = 0.10f * intensity)) },
-                    innerShadow = { InnerShadow(radius = 3.dp, alpha = 0.14f * intensity) },
+                    highlight = { Highlight.Default.copy(alpha = (if (dragging) 0.82f else 0.66f) * intensity) },
+                    shadow = { Shadow(radius = 6.dp, color = Color.Black.copy(alpha = 0.13f * intensity)) },
+                    innerShadow = { InnerShadow(radius = 4.dp, alpha = 0.3f * intensity) },
                     onDrawSurface = {
                         drawRect(Color.White.copy(alpha = 0.78f * intensity))
                         drawRect(primary.copy(alpha = position.value * 0.06f * intensity))

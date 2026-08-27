@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -8,7 +10,7 @@ plugins {
 
 android {
     namespace = "com.unmiss.app"
-    compileSdk = 36
+    compileSdk = 37
 
     val releaseStorePassword = System.getenv("UNMISS_KEYSTORE_PASSWORD")
     val releaseKeyPassword = System.getenv("UNMISS_KEY_PASSWORD")
@@ -31,8 +33,8 @@ android {
         applicationId = "com.unmiss.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 26
-        versionName = "0.7.0"
+        versionCode = 27
+        versionName = "0.8.0"
     }
 
     buildTypes {
@@ -58,12 +60,14 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-
     buildFeatures {
         compose = true
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -89,7 +93,5 @@ dependencies {
     implementation(libs.okhttp)
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.kotlinx.serialization.json)
-    // AndroidLiquidGlass / Backdrop. 1.0.6 remains compatible with compileSdk 36.
-    implementation(files("libs/backdrop-1.0.6.aar"))
-    implementation(files("libs/shapes-android-1.2.0.aar"))
+    implementation(libs.backdrop)
 }
